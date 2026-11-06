@@ -169,6 +169,7 @@ class Resolver:
             for arg in expr.args:
                 self._expr(arg)
 
+    #TODO(T2)
     def _column(self, col: ast.ColumnRef) -> None:
         if col.qualifier is not None:
             entry = self._lookup(col.qualifier)

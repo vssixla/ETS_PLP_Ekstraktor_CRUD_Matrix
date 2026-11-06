@@ -82,6 +82,81 @@ Sebelum perbaikan, test bawaan test_insert_select telah terbukti gagal dengan pe
 AI membantu menjelaskan tujuan TODO(T1), menyarankan pemanggilan _select() dari _insert(), memberikan contoh pembentukan node AST INSERT. AI juga membantu memperbaiki kesalahan saat penyusunan kode, terutama kesalahan ppercabangan if pada "if self._check_kw("SELECT"):" dan membantu validasi kode program untuk test TODO T1 dengan memberikan rekomendasi tambahan kode program untuk test ini.
 
 
+## TODO T2: Melengkapi Resolusi Kolom Tanpa Qualifier
+Ditemukan oleh: ALIA ARDANI dan SHAHNAZ SASKIA PUTRI, berdasarkan penanda TODO(T2) pada kode awal · Diperbaiki oleh: ALIA ARDANI
+
+**Gejala.** 
+Resolver belum dapat menentukan sumber tabel untuk kolom yang ditulis tanpa qualifier. Qualifier adalah nama tabel atau alias yang diletakkan sebelum nama kolom, seperti p pada p.nama. Pada query SELECT nama FROM pelanggan WHERE aktif = 1;, kolom nama dan aktif tidak memiliki qualifier, tetapi query hanya memiliki satu sumber tabel, yaitu pelanggan. Kedua kolom tersebut seharusnya dapat diarahkan ke tabel pelanggan.
+
+Pada kode awal, atribut resolved kedua kolom tetap bernilai None. Kondisi ini terlihat pada kegagalan test bawaan test_kolom_tanpa_qualifier_satu_tabel, yang mengharapkan hasil resolusi {"pelanggan"}, tetapi memperoleh {None}.
+
+Berdasarkan SPESIFIKASI.md bagian 4.3, kolom tanpa qualifier harus diperiksa menggunakan sumber yang terdapat pada scope terdalam. Apabila terdapat tepat satu sumber, kolom diarahkan ke sumber tersebut. Apabila terdapat lebih dari satu sumber, resolver memberikan warning "ambigu tanpa skema". Apabila tidak terdapat sumber, resolver memberikan warning dan membiarkan kolom tidak teresolusi.
+
+**Reproduksi minimal.**
+SELECT nama FROM pelanggan;
+Pada kode awal, query tersebut dapat diparsing, tetapi kolom nama tetap memiliki resolved = None setelah melewati resolver. Hasil yang diharapkan adalah resolved = "pelanggan" tanpa diagnostic, karena scope query hanya memiliki satu sumber tabel.
+
+Masalah ini menyangkut informasi keterkaitan kolom dengan sumber tabelnya. Oleh karena itu, pemeriksaan dilakukan langsung terhadap hasil resolusi pada AST. CRUD matrix saja belum cukup untuk membuktikan bahwa fitur ini bekerja, karena tabel pelanggan masih dapat tercatat sebagai sumber pembacaan meskipun kolomnya belum teresolusi.
+
+**Akar masalah.**
+Fungsi _column() dalam crud/resolver.py sudah menangani kolom yang memiliki qualifier. Pada cabang tersebut, resolver memanggil _lookup() untuk mencari alias atau nama tabel, kemudian menggunakan _target_of() untuk mengisi atribut resolved.
+
+Namun, ketika kolom tidak memiliki qualifier, fungsi melewati cabang tersebut dan mencapai bagian TODO(T2) yang hanya berisi pass. Pernyataan pass tidak melakukan pemrosesan apa pun. Akibatnya, resolver tidak menghitung sumber pada scope terdalam, tidak menentukan target kolom ketika sumbernya tunggal, dan tidak memberikan warning ketika sumbernya ambigu atau tidak tersedia.
+
+Permasalahan ini berkaitan dengan konsep resolusi nama dan scope dalam Crafting Interpreters Bab 11. Parser membentuk struktur sintaks, sedangkan resolver menghubungkan penggunaan nama dengan lingkungan tempat nama tersebut digunakan. Dalam proyek ini, resolver menghubungkan referensi kolom dengan sumber tabel sesuai aturan spesifikasi.
+
+Untuk kolom tanpa qualifier, pemeriksaan dibatasi pada scope terdalam. Resolver tidak boleh mengambil sumber dari scope luar hanya karena sumber pada scope terdalam tidak tersedia. Selain itu, resolver tidak memiliki informasi skema yang menjelaskan kolom milik setiap tabel. Karena itu, ketika terdapat beberapa sumber, resolver tidak dapat menentukan asal kolom hanya berdasarkan nama kolomnya.
+
+**Perbaikan.**
+Perubahan dilakukan pada bagian TODO(T2) dalam fungsi _column() di crud/resolver.py. Bagian pass diganti dengan pengambilan daftar sumber melalui self.scope.entries.values(). Daftar tersebut diambil dari scope terdalam karena, menurut spesifikasi, resolusi kolom tanpa qualifier hanya menggunakan sumber pada scope tersebut. Jika tidak ada scope aktif, daftar sumber dibuat kosong agar program tidak mencoba mengakses atribut entries dari None.
+
+Atribut col.resolved kemudian diatur menjadi None sebagai kondisi awal sebelum sumber kolom ditentukan. Jika terdapat tepat satu entry, atribut tersebut diisi menggunakan _target_of(entries[0]) karena hanya ada satu sumber yang dapat dirujuk. Fungsi _target_of() digunakan kembali agar hasil resolusi mengikuti representasi target yang sudah tersedia dalam program, baik nama tabel maupun penanda subquery.
+
+Jika terdapat lebih dari satu entry, resolver memberikan warning "ambigu tanpa skema" dan membiarkan col.resolved bernilai None. Hal ini dilakukan karena resolver tidak memiliki informasi skema untuk memastikan asal kolom sehingga tidak boleh memilih salah satu sumber secara sembarangan. Jika tidak terdapat entry, resolver memberikan warning "kolom tanpa tabel dalam scope" karena tidak ada sumber yang dapat digunakan untuk menentukan target kolom. Kedua warning menggunakan col.line agar lokasi masalah dapat diketahui dari nomor baris kolom yang diperiksa.
+
+**Test regresi.**
+Pengujian tambahan dibuat dalam tests/test_tambahan.py melalui fungsi
+test_t2_kolom_tanpa_qualifier dan test_t2_kolom_tanpa_qualifier_scope_kosong.
+
+Test pertama memeriksa dua kondisi menggunakan SQL yang diterima parser. Pada input SELECT nama FROM pelanggan;, kolom harus teresolusi ke pelanggan tanpa diagnostic. Pada input SELECT nama FROM pelanggan p, pesanan o;, kolom harus tetap tidak teresolusi dan menghasilkan satu diagnostic berlevel warning yang memuat pesan "ambigu tanpa skema". Pemeriksaan juga memastikan diagnostic mencatat nomor baris yang sesuai.
+
+Pada penyusunan awal test tambahan, kondisi tanpa sumber diuji menggunakan SELECT nama;. Setelah dijalankan, input tersebut ternyata ditolak parser dengan pesan bahwa keyword FROM diharapkan. Kegagalan terjadi sebelum resolver dijalankan sehingga tidak dapat digunakan untuk menilai perilaku T2. Contoh pengujian tersebut kemudian diperbaiki tanpa mengubah grammar parser maupun test bawaan.
+
+Pengujian scope kosong dipisahkan menjadi unit test resolver. Test memperoleh node kolom dari query valid, kemudian membuat scope luar yang memiliki sumber pelanggan dan scope terdalam yang kosong. Fungsi _column() dipanggil langsung untuk memastikan kolom tetap memiliki resolved = None serta menghasilkan warning. Susunan ini juga memeriksa bahwa resolver tidak mengambil tabel dari scope luar ketika scope terdalam kosong.
+
+Kedua test tambahan dijalankan bersama seluruh test bawaan dalam tests/test_resolver.py menggunakan perintah berikut:
+python -m pytest tests/test_resolver.py tests/test_tambahan.py::test_t2_kolom_tanpa_qualifier tests/test_tambahan.py::test_t2_kolom_tanpa_qualifier_scope_kosong -v
+
+Hasil pengujian menunjukkan 6 passed in 0.23s. Bukti kegagalan sebelum perbaikan tersedia dari test bawaan test_kolom_tanpa_qualifier_satu_tabel, yang sebelumnya memperoleh {None}. Setelah perbaikan, test tersebut dan kedua test tambahan lulus. Hasil ini membuktikan perilaku pada kasus yang diuji, tetapi belum membuktikan bahwa seluruh aturan resolver telah terpenuhi.
+
+**Peran AI.**
+AI membantu saya memperbaiki kesalahan kode program fungsi _column() pada bagian TODO(T2) dan program pada test tambahan. Awalnya, saya hanya menambahkan test_t2_kolom_tanpa_qualifier, tetapi contoh input SELECT nama; yang disarankan AI ternyata tidak sesuai dengan grammar proyek karena parser mewajibkan FROM. AI kemudian menyarankan penambahan test_t2_kolom_tanpa_qualifier_scope_kosong untuk menguji kondisi scope kosong secara langsung pada resolver.
+
+
+## TODO T3: Dukungan Komentar Blok
+Ditemukan oleh: ALIA ARDANI dan SHAHNAZ SASKIA PUTRI, berdasarkan penanda TODO(T3) pada kode awal · Diperbaiki oleh: SHAHNAZ SASKIA PUTRI
+
+**Gejala.** 
+Berdasarkan SPESIFIKASI.md bagian 2.3, komentar blok /* ... */ dapat terdiri dari beberapa baris, boleh mengandung karakter *, tidak boleh bersarang, tidak menghasilkan token, dan harus menghasilkan LexError jika tidak ditutup.
+Namun, pada kode awal, lexer langsung menghasilkan LexError: komentar blok belum didukung ketika menemukan /*. Akibatnya, test bawaan test_komentar_blok gagal dan file pemeliharaan.sql yang diawali komentar blok tidak dapat dianalisis karena terjadi LEX ERROR: Baris 1, kolom 1.
+
+**Akar masalah.**
+Lexer belum memiliki implementasi untuk membaca komentar blok. Ketika menemukan /*, proses pemindaian langsung dihentikan dengan LexError tanpa memeriksa isi maupun penutup komentar.
+Masalah ini berkaitan dengan konsep Longer Lexemes pada Crafting Interpreters Bab 4 bagian 4.6. Scanner perlu terus membaca karakter hingga menemukan penanda akhir, kemudian mengabaikan isi komentar. Untuk komentar blok, penanda akhirnya adalah */, sehingga diperlukan lookahead /peek untuk memeriksa karakter berikutnya sebelum menentukan apakah komentar sudah berakhir.
+
+**Perbaikan.**
+Perubahan dilakukan pada fungsi _scan_token di file crud/lexer.py. Ketika menemukan karakter / yang diikuti *, lexer akan membaca isi komentar hingga menemukan pasangan */. Jika penutup ditemukan, komentar diabaikan tanpa menghasilkan token. Namun, jika input berakhir sebelum penutup ditemukan, lexer akan menghasilkan LexError("komentar blok tidak ditutup", line, col) dengan posisi awal komentar.
+Alternatifnya menghapus komentar menggunakan pencarian teks sebelum proses pemindaian dimulai. Tapi cara tersebut tidak dipilih karena posisi baris dan kolom harus dihitung ulang secara manual. Dengan menggunakan _advance(), posisi baris dan kolom dapat diperbarui secara otomatis.
+
+**Test regresi.**
+Dua test tambahan dibuat pada tests/test_tambahan.py, yaitu test_komentar_blok_berisi_bintang untuk memastikan karakter ** tidak membuat komentar berhenti terlalu awal, dan test_komentar_blok_tidak_ditutup untuk memastikan komentar tanpa penutup menghasilkan LexError.
+
+Sebelum perbaikan, test bawaan test_komentar_blok gagal dengan pesan LexError: komentar blok belum didukung. Setelah perbaikan, test tersebut berhasil dilewati. Jumlah test yang gagal pada seluruh suite juga berkurang dari 4 menjadi 3.
+
+**Peran AI.**
+AI membantu memberikan arahan mengenai proses pemindaian komentar blok serta menyarankan contoh kode ketika saya mengalami kesulitan dalam implementasinya. Selama proses tersebut, saya juga mempelajari perubahan yang disarankan agar memahami cara kerja perbaikannya. Setelah itu, saya menjalankan test bawaan, menambahkan test tambahan, dan menguji seluruh test suite untuk memastikan perbaikan berjalan dengan baik.
+
+
 ## Bug 1: Parser Membuang Statement Valid setelah Kesalahan Sintaks
 **Ditemukan oleh:** ALIA ARDANI dan SHAHNAZ SASKIA PUTRI · **Diperbaiki oleh:** ALIA ARDANI
 
@@ -258,7 +333,6 @@ AI membantu menghubungkan pesan parse error pada laporan_penjualan.sql dengan ke
 
 
 ## Bug 4: Kutip Ganda di Dalam String Memecah Satu String Menjadi Dua Token
-
 **Ditemukan oleh:** SHAHNAZ SASKIA PUTRI · **Diperbaiki oleh:** SHAHNAZ SASKIA PUTRI
 
 **Gejala.**
@@ -287,10 +361,37 @@ Sebelum perbaikan, test gagal dengan pesan assert 3 == 2. Setelah perbaikan, tes
 AI membantu memberikan arahan dalam memperbaiki fungsi _string serta menyarankan bentuk test untuk menguji bug. Saya mengikuti arahan tersebut sambil mempelajari cara kerja dan memahami perubahan yang dilakukan.
 
 
+## Bug 5: Tabel di Subquery pada UPDATE Salah Ditandai U
+**Ditemukan oleh:** ALIA ARDANI dan SHAHNAZ SASKIA PUTRI · **Diperbaiki oleh:** ALIA ARDANI dan SHAHNAZ SASKIA PUTRI
+
+**Gejala.**
+Menurut SPESIFIKASI.md bagian 5, tabel yang dibaca lewat subquery selalu berstatus R, apa pun jenis statement luarnya, dan hanya tabel target UPDATE yang berstatus U. Pada kode lama, tabel di dalam subquery pada klausa `SET` maupun `WHERE` ikut ditandai U. Test yang saya tulis gagal karena `pesanan` keluar `U`, padahal seharusnya `R`. Test bawaan `test_matrix_laporan_penjualan` juga gagal karena alasan yang sama (`pesanan` keluar `RUD`, seharusnya `RD`).
+
+**Reproduksi minimal.** SQL
+```
+UPDATE pelanggan SET aktif = 0 WHERE id IN (SELECT pelanggan_id FROM pesanan);
+```
+Hasil yang diharapkan adalah `pelanggan` bernilai U dan `pesanan` bernilai R. Kode lama menghasilkan `pelanggan` U dan `pesanan` U.
+
+**Akar masalah.**
+Pada cabang UPDATE di `analyze_statement`, kode lama menelusuri ekspresi `SET` dan `WHERE` dengan operasi `"U"`, sehingga setiap tabel yang ditemukan di dalam subquery pada ekspresi itu ikut menerima operasi U. Operasi statement luar diturunkan begitu saja ke tabel di dalam subquery, padahal operasi sebuah tabel ditentukan oleh perannya, yaitu target yang diubah atau sumber yang dibaca.
+
+Masalah ini berkaitan dengan penelusuran AST pada Crafting Interpreters Bab 5 (Representing Code). Analyzer bekerja di atas pohon, dan keputusan tiap node bergantung pada posisinya di pohon, bukan pada jenis statement paling luar.
+
+**Perbaikan.**
+Perubahan dilakukan pada `crud/analyzer.py`, di cabang UPDATE pada `analyze_statement`. Argumen operasi pada dua pemanggilan `_collect`, yaitu untuk ekspresi `SET` dan untuk `WHERE`, diubah dari `"U"` menjadi `"R"`. Baris yang menandai tabel target UPDATE sebagai `U` tidak diubah.
+
+Alternatif yang dipertimbangkan adalah membiarkan penelusuran seperti semula, lalu membuang status U dari semua tabel selain target setelah analisis selesai. Alternatif ini tidak dipilih karena hanya menambal hasil, sedangkan penyebabnya adalah operasi yang salah diteruskan saat penelusuran.
+
+**Test regresi.**
+Test `test_subquery_di_update_hanya_dibaca` ditambahkan di `tests/test_tambahan.py`. Sebelum perbaikan test ini gagal karena `pesanan` bernilai `U`, dan sesudah perbaikan lulus. Test bawaan `test_matrix_laporan_penjualan` yang sebelumnya gagal juga ikut lulus. Satu-satunya test yang masih gagal pada seluruh suite adalah test TODO(T2) di resolver yang sedang dikerjakan.
+
+**Peran AI.**
+AI menunjukkan lokasi kode yang perlu diperiksa dan mengusulkan perubahan `"U"` menjadi `"R"` serta contoh isi test. Saya menulis test, menjalankannya sampai terlihat gagal, mengubah dua baris di `analyzer.py`, lalu memverifikasi bahwa test tersebut lulus dan seluruh suite tidak memiliki test baru yang rusak.
 
 
 
-
+## =============================================================================================================
 ## Bug 1: (judul singkat)
 
 **Ditemukan oleh:** (nama) · **Diperbaiki oleh:** (nama)
