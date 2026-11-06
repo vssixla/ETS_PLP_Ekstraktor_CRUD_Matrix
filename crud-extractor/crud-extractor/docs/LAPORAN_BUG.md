@@ -4,8 +4,85 @@ Salin blok di bawah untuk setiap bug. Bagian **Akar masalah** wajib ditulis deng
 sendiri dan memakai konsep dari *Crafting Interpreters* (sebutkan bab). Bagian ini diuji lisan.
 
 ---
-## Bug 1: Parser Membuang Statement Valid setelah Kesalahan Sintaks
 
+## TODO T1: Melengkapi Dukungan INSERT ... SELECT
+Ditemukan oleh: ALIA ARDANI, berdasarkan penanda TODO(T1) pada kode awal · Diperbaiki oleh: ALIA ARDANI
+
+**Gejala.** 
+Program belum dapat memproses perintah INSERT yang mengambil data dari hasil query SELECT. Ketika menerima bentuk tersebut, parser menghasilkan pesan:
+INSERT ... SELECT belum didukung, ditemukan 'SELECT'
+
+Padahal, grammar pada SPESIFIKASI.md bagian 3 mengizinkan sumber data INSERT berupa VALUES maupun query SELECT. Berdasarkan aturan CRUD pada bagian 5, tabel tujuan INSERT mendapatkan operasi C, sedangkan tabel yang dibaca oleh SELECT mendapatkan operasi R. 
+
+Akibat fitur ini belum diimplementasikan, statement INSERT SELECT yang valid dianggap mengalami kesalahan parsing dan tidak dapat dianalisis sebagaimana mestinya.
+
+**Reproduksi minimal.**
+INSERT INTO arsip SELECT id FROM pesanan;
+Pada kode awal, parser menolak statement tersebut ketika mencapai keyword SELECT.
+
+Hasil yang diharapkan adalah satu statement INSERT yang memiliki query SELECT sebagai sumber data, tanpa parse error. CRUD matrix yang diharapkan:
+| Tabel     | Operasi |
+|-------    |---------|
+| `arsip`   | C       |
+| `pesanan` | R       |
+
+**Akar masalah.**
+Fungsi _insert() dalam crud/parser.py sudah membaca keyword INSERT, tabel tujuan, dan daftar kolom tujuan jika tersedia. Fungsi tersebut juga sudah memiliki implementasi untuk sumber data berbentuk VALUES.
+
+Namun, cabang yang mendeteksi keyword SELECT langsung menjalankan:
+raise ParseError("INSERT ... SELECT belum didukung", self._peek())
+
+Dengan demikian, parser sebenarnya sudah mengenali awal bentuk INSERT SELECT, tetapi belum melanjutkan pembacaan query tersebut. Ini merupakan bagian implementasi yang belum selesai, sesuai penanda TODO(T1).
+
+Masalah ini berkaitan dengan konsep recursive descent parsing pada Crafting Interpreters Bab 6. Setiap aturan grammar diterjemahkan menjadi fungsi parser. Ketika aturan INSERT mengandung aturan SELECT, fungsi parser INSERT dapat memanggil fungsi parser SELECT yang sudah tersedia.
+
+Keterkaitannya dengan Bab 5 adalah representasi sintaks dalam AST. Statement INSERT SELECT perlu direpresentasikan sebagai node INSERT yang menyimpan node SELECT di dalam field query. Jika query tersebut tidak dibentuk dan disimpan, tahap berikutnya tidak memiliki struktur yang diperlukan untuk menelusuri sumber data INSERT.
+
+**Perbaikan.**
+Perubahan dilakukan pada fungsi _insert() dalam crud/parser.py. Cabang yang sebelumnya menolak SELECT diganti dengan pemanggilan _select(), kemudian hasilnya disimpan dalam node ast.Insert:
+if self._check_kw("SELECT"):
+    query = self._select()
+    return ast.Insert(
+        table=table,
+        columns=columns,
+        values=[],
+        query=query,
+        line=start.line,
+    )
+raise ParseError("diharapkan VALUES atau SELECT", self._peek())
+
+Perubahan ini memungkinkan INSERT menggunakan query SELECT sebagai sumber data. 
+Fungsi _select() digunakan kembali untuk membaca query dan membentuk AST, sedangkan table dan columns mempertahankan informasi tabel tujuan serta kolom yang akan diisi. Atribut values=[] menunjukkan bahwa data tidak berasal dari klausa VALUES, sementara query=query menyimpan hasil parsing SELECT. Keyword SELECT tidak dikonsumsi terlebih dahulu karena pembacaannya sudah ditangani oleh _select(). 
+
+Perbaikan ini juga mempertahankan dukungan INSERT ... VALUES yang sudah tersedia tanpa menduplikasi logika parsing SELECT.
+
+**Test regresi.**
+Test tambahan dibuat dalam tests/test_tambahan.py dengan nama:
+test_insert_select_membentuk_ast_dan_crud
+
+Input yang digunakan:
+INSERT INTO arsip (id) SELECT id FROM pesanan;
+
+Test memeriksa bahwa:
+    1. Parsing selesai tanpa parse error dan menghasilkan satu statement.
+    2. Statement tersebut merupakan node ast.Insert.
+    3. Tabel tujuan adalah arsip dan kolom tujuannya adalah id.
+    4. Field values kosong dan field query berisi node ast.Select.
+    5. Query SELECT memiliki tabel sumber pesanan.
+    6. Analisis menghasilkan operasi C untuk arsip dan R untuk pesanan.
+
+Pengujian dilakukan bersama test bawaan:
+python -m pytest tests/test_parser.py::test_insert_select tests/test_parser.py::test_insert_values tests/test_tambahan.py::test_insert_select_membentuk_ast_dan_crud -v
+
+Hasil: 
+3 passed in 0.18s
+Sebelum perbaikan, test bawaan test_insert_select telah terbukti gagal dengan pesan bahwa INSERT SELECT belum didukung. Setelah perbaikan, test bawaan tersebut lulus.
+
+**Peran AI.**
+AI membantu menjelaskan tujuan TODO(T1), menyarankan pemanggilan _select() dari _insert(), memberikan contoh pembentukan node AST INSERT. AI juga membantu memperbaiki kesalahan saat penyusunan kode, terutama kesalahan ppercabangan if pada "if self._check_kw("SELECT"):" dan membantu validasi kode program untuk test TODO T1 dengan memberikan rekomendasi tambahan kode program untuk test ini.
+
+
+## Bug 1: Parser Membuang Statement Valid setelah Kesalahan Sintaks
 **Ditemukan oleh:** ALIA ARDANI · **Diperbaiki oleh:** ALIA ARDANI
 
 **Gejala.** 

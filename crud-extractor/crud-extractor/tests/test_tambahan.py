@@ -67,6 +67,40 @@ def test_operator_tidak_sama_dipindai_sebagai_satu_token():
         (TokenType.EOF, ""),
     ]
 
+#tes_TODO (T1)
+def test_insert_select_membentuk_ast_dan_crud():
+    from crud import ast_nodes as ast
+    from crud.parser import parse_sql
+    from crud.pipeline import analyze_source
+
+    sql = "INSERT INTO arsip (id) SELECT id FROM pesanan;"
+
+    # Parser menerima INSERT ... SELECT tanpa kesalahan.
+    script = parse_sql(sql)
+
+    assert script.errors == []
+    assert len(script.statements) == 1
+
+    # AST menyimpan tabel tujuan dan query sumber.
+    statement = script.statements[0]
+
+    assert isinstance(statement, ast.Insert)
+    assert statement.table.name == "arsip"
+    assert statement.columns == ["id"]
+    assert statement.values == []
+    assert isinstance(statement.query, ast.Select)
+    assert statement.query.sources[0].name == "pesanan"
+
+    # INSERT membuat data pada tujuan dan membaca tabel sumber.
+    hasil = analyze_source(sql)
+
+    assert hasil.lex_error is None
+    assert hasil.parse_errors == []
+    assert hasil.matrix() == {
+        "arsip": "C",
+        "pesanan": "R",
+    }
+
 #tes_TODO (T3)
 def test_komentar_blok_berisi_bintang():
     toks = tokenize("a /* x ** y */ b")
@@ -77,3 +111,4 @@ def test_komentar_blok_berisi_bintang():
 def test_komentar_blok_tidak_ditutup():
     with pytest.raises(LexError):
         tokenize("SELECT 1 /* belum ditutup")
+
