@@ -67,7 +67,7 @@ def test_operator_tidak_sama_dipindai_sebagai_satu_token():
         (TokenType.EOF, ""),
     ]
 
-#tes_TODO (T3)
+#test untuk_TODO (T3) komentar blok
 def test_komentar_blok_berisi_bintang():
     toks = tokenize("a /* x ** y */ b")
     assert toks[0].value == "a"
@@ -77,3 +77,9 @@ def test_komentar_blok_berisi_bintang():
 def test_komentar_blok_tidak_ditutup():
     with pytest.raises(LexError):
         tokenize("SELECT 1 /* belum ditutup")
+
+#Bug 4
+def test_string_kutip_ganda_menjadi_satu_token():
+    toks = tokenize("'O''Brien'")
+    assert len(toks) == 2          # satu STRING + EOF
+    assert toks[0].value == "O'Brien"
