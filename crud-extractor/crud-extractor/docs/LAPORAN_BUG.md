@@ -82,6 +82,30 @@ Sebelum perbaikan, test bawaan test_insert_select telah terbukti gagal dengan pe
 AI membantu menjelaskan tujuan TODO(T1), menyarankan pemanggilan _select() dari _insert(), memberikan contoh pembentukan node AST INSERT. AI juga membantu memperbaiki kesalahan saat penyusunan kode, terutama kesalahan ppercabangan if pada "if self._check_kw("SELECT"):" dan membantu validasi kode program untuk test TODO T1 dengan memberikan rekomendasi tambahan kode program untuk test ini.
 
 
+## TODO T3: Dukungan Komentar Blok
+Ditemukan oleh: SHAHNAZ SASKIA PUTRI, berdasarkan penanda TODO(T3) pada kode awal · Diperbaiki oleh: SHAHNAZ SASKIA PUTRI
+
+**Gejala.** 
+Berdasarkan SPESIFIKASI.md bagian 2.3, komentar blok /* ... */ dapat terdiri dari beberapa baris, boleh mengandung karakter *, tidak boleh bersarang, tidak menghasilkan token, dan harus menghasilkan LexError jika tidak ditutup.
+Namun, pada kode awal, lexer langsung menghasilkan LexError: komentar blok belum didukung ketika menemukan /*. Akibatnya, test bawaan test_komentar_blok gagal dan file pemeliharaan.sql yang diawali komentar blok tidak dapat dianalisis karena terjadi LEX ERROR: Baris 1, kolom 1.
+
+**Akar masalah.**
+Lexer belum memiliki implementasi untuk membaca komentar blok. Ketika menemukan /*, proses pemindaian langsung dihentikan dengan LexError tanpa memeriksa isi maupun penutup komentar.
+Masalah ini berkaitan dengan konsep Longer Lexemes pada Crafting Interpreters Bab 4 bagian 4.6. Scanner perlu terus membaca karakter hingga menemukan penanda akhir, kemudian mengabaikan isi komentar. Untuk komentar blok, penanda akhirnya adalah */, sehingga diperlukan lookahead /peek untuk memeriksa karakter berikutnya sebelum menentukan apakah komentar sudah berakhir.
+
+**Perbaikan.**
+Perubahan dilakukan pada fungsi _scan_token di file crud/lexer.py. Ketika menemukan karakter / yang diikuti *, lexer akan membaca isi komentar hingga menemukan pasangan */. Jika penutup ditemukan, komentar diabaikan tanpa menghasilkan token. Namun, jika input berakhir sebelum penutup ditemukan, lexer akan menghasilkan LexError("komentar blok tidak ditutup", line, col) dengan posisi awal komentar.
+Alternatifnya menghapus komentar menggunakan pencarian teks sebelum proses pemindaian dimulai. Tapi cara tersebut tidak dipilih karena posisi baris dan kolom harus dihitung ulang secara manual. Dengan menggunakan _advance(), posisi baris dan kolom dapat diperbarui secara otomatis.
+
+**Test regresi.**
+Dua test tambahan dibuat pada tests/test_tambahan.py, yaitu test_komentar_blok_berisi_bintang untuk memastikan karakter ** tidak membuat komentar berhenti terlalu awal, dan test_komentar_blok_tidak_ditutup untuk memastikan komentar tanpa penutup menghasilkan LexError.
+
+Sebelum perbaikan, test bawaan test_komentar_blok gagal dengan pesan LexError: komentar blok belum didukung. Setelah perbaikan, test tersebut berhasil dilewati. Jumlah test yang gagal pada seluruh suite juga berkurang dari 4 menjadi 3.
+
+**Peran AI.**
+AI membantu memberikan arahan mengenai proses pemindaian komentar blok serta menyarankan contoh kode ketika saya mengalami kesulitan dalam implementasinya. Selama proses tersebut, saya juga mempelajari perubahan yang disarankan agar memahami cara kerja perbaikannya. Setelah itu, saya menjalankan test bawaan, menambahkan test tambahan, dan menguji seluruh test suite untuk memastikan perbaikan berjalan dengan baik.
+
+
 ## Bug 1: Parser Membuang Statement Valid setelah Kesalahan Sintaks
 **Ditemukan oleh:** ALIA ARDANI · **Diperbaiki oleh:** ALIA ARDANI
 
@@ -256,6 +280,40 @@ Hasil tersebut membuktikan bahwa kasus <> yang diuji sudah benar dan operator pa
 
 **Peran AI.**
 AI membantu menghubungkan pesan parse error pada laporan_penjualan.sql dengan kesalahan pembentukan token operator <>. AI juga membantu menyusun test regresi, menjelaskan konsep lookahead dan maximal munch, serta menyarankan perubahan pada fungsi _scan_token().
+
+
+## Bug 4: Kutip Ganda di Dalam String Memecah Satu String Menjadi Dua Token
+
+**Ditemukan oleh:** SHAHNAZ SASKIA PUTRI · **Diperbaiki oleh:** SHAHNAZ SASKIA PUTRI
+
+**Gejala.**
+Berdasarkan SPESIFIKASI.md bagian 2.4, dua kutip tunggal berurutan ('') di dalam string harus dianggap sebagai satu karakter kutip. Contoh 'O''Brien' seharusnya menghasilkan satu token STRING dengan nilai O'Brien.
+Namun, pada kode lama lexer malah menghasilkan dua token STRING terpisah, yaitu O dan Brien. Test yang dibuat gagal dengan pesan assert 3 == 2 karena menghasilkan tiga token yaitu STRING O, STRING Brien, dan EOF. Akibatnya, parser menganggap query yang sebenarnya valid sebagai kesalahan sintaks.
+
+**Reproduksi minimal.** SQL
+```
+SELECT id FROM pelanggan WHERE nama = 'O''Brien';
+```
+Hasil yang diharapkan adalah satu token STRING dengan nilai O'Brien pada bagian kondisi WHERE.
+
+**Akar masalah.**
+Masalah terdapat pada fungsi _string yang langsung mengakhiri pembacaan string ketika menemukan kutip tunggal pertama. Fungsi tersebut tidak memeriksa apakah kutip tersebut diikuti oleh kutip tunggal lainnya. Akibatnya, pasangan '' dianggap sebagai penutup string sekaligus pembuka string baru, sehingga satu string terpecah menjadi dua token.
+Masalah ini berkaitan dengan konsep pemindaian string literal dalam Crafting Interpreters Bab 4 bagian 4.6.1. Scanner perlu menggunakan lookahead/peek untuk memeriksa karakter berikutnya sebelum menentukan apakah string tersebut sudah berakhir. 
+
+**Perbaikan.**
+Perbaikan dilakukan pada fungsi _string di file crud/lexer.py. Ketika menemukan kutip tunggal, fungsi akan memeriksa karakter berikutnya menggunakan self._peek(). Jika karakter berikutnya juga kutip tunggal, kutip dibaca sebagai bagian dari isi string dan proses pemindaian dilanjutkan. Jika tidak, kutip dianggap sebagai penutup string.
+Alternatifnya menggabungkan dua token STRING melalui parser. Namun, cara ini tidak dipilih karena spesifikasi menetapkan bahwa '' harus ditangani sebagai satu token pada tahap lexer, juga penggabungan di parser berisiko mengganggu informasi baris dan kolom token.
+
+**Test regresi.**
+Test test_string_kutip_ganda_menjadi_satu_token ditambahkan pada tests/test_tambahan.py. Test ini memastikan bahwa 'O''Brien' menghasilkan dua token yaitu satu STRING dan EOF, dengan nilai token pertama O'Brien.
+Sebelum perbaikan, test gagal dengan pesan assert 3 == 2. Setelah perbaikan, test berhasil dilewati dan jumlah test yang gagal pada seluruh suite berkurang dari 4 menjadi 3.
+
+**Peran AI.**
+AI membantu memberikan arahan dalam memperbaiki fungsi _string serta menyarankan bentuk test untuk menguji bug. Saya mengikuti arahan tersebut sambil mempelajari cara kerja dan memahami perubahan yang dilakukan.
+
+
+
+
 
 
 ## Bug 1: (judul singkat)
