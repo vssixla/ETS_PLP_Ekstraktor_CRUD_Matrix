@@ -6,10 +6,11 @@ Isi dengan:
 2. Lima test kasus tepi, masing-masing dengan komentar singkat mengapa kasus itu berisiko.
 """
 
-#test untuk Bug 1
+import pytest
 from crud.pipeline import analyze_source
-from crud.lexer import tokenize
+from crud.lexer import tokenize, LexError
 
+#test untuk Bug 1
 def test_recovery_memproses_statement_setelah_error():
     sql = (
         "SELECT id FROM pelanggan;\n"
@@ -65,3 +66,14 @@ def test_operator_tidak_sama_dipindai_sebagai_satu_token():
         (TokenType.NUMBER, "10"),
         (TokenType.EOF, ""),
     ]
+
+#tes_TODO (T3)
+def test_komentar_blok_berisi_bintang():
+    toks = tokenize("a /* x ** y */ b")
+    assert toks[0].value == "a"
+    assert toks[1].value == "b"
+
+
+def test_komentar_blok_tidak_ditutup():
+    with pytest.raises(LexError):
+        tokenize("SELECT 1 /* belum ditutup")
