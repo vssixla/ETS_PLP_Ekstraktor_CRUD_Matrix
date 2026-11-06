@@ -117,3 +117,10 @@ def test_string_kutip_ganda_menjadi_satu_token():
     toks = tokenize("'O''Brien'")
     assert len(toks) == 2          # satu STRING + EOF
     assert toks[0].value == "O'Brien"
+
+#Bug 5
+def test_subquery_di_update_hanya_dibaca():
+    hasil = analyze_source(
+        "UPDATE pelanggan SET aktif = 0 WHERE id IN (SELECT pelanggan_id FROM pesanan);"
+    )
+    assert hasil.matrix() == {"pelanggan": "U", "pesanan": "R"}
