@@ -362,7 +362,7 @@ AI membantu memberikan arahan dalam memperbaiki fungsi _string serta menyarankan
 
 
 ## Bug 5: Tabel di Subquery pada UPDATE Salah Ditandai U
-**Ditemukan oleh:** ALIA ARDANI dan SHAHNAZ SASKIA PUTRI · **Diperbaiki oleh:** ALIA ARDANI dan SHAHNAZ SASKIA PUTRI
+**Ditemukan oleh:** ALIA ARDANI dan SHAHNAZ SASKIA PUTRI · **Diperbaiki oleh:** SHAHNAZ SASKIA PUTRI dan ALIA ARDANI
 
 **Gejala.**
 Menurut SPESIFIKASI.md bagian 5, tabel yang dibaca lewat subquery selalu berstatus R, apa pun jenis statement luarnya, dan hanya tabel target UPDATE yang berstatus U. Pada kode lama, tabel di dalam subquery pada klausa `SET` maupun `WHERE` ikut ditandai U. Test yang saya tulis gagal karena `pesanan` keluar `U`, padahal seharusnya `R`. Test bawaan `test_matrix_laporan_penjualan` juga gagal karena alasan yang sama (`pesanan` keluar `RUD`, seharusnya `RD`).
@@ -388,6 +388,72 @@ Test `test_subquery_di_update_hanya_dibaca` ditambahkan di `tests/test_tambahan.
 
 **Peran AI.**
 AI menunjukkan lokasi kode yang perlu diperiksa dan mengusulkan perubahan `"U"` menjadi `"R"` serta contoh isi test. Saya menulis test, menjalankannya sampai terlihat gagal, mengubah dua baris di `analyzer.py`, lalu memverifikasi bahwa test tersebut lulus dan seluruh suite tidak memiliki test baru yang rusak.
+
+
+## BUG 6: ALIAS DELETE BOCOR KE STATEMENT BERIKUTNYA
+**Ditemukan oleh:** ALIA ARDANI dan SHAHNAZ SASKIA PUTRI · 
+**Diperbaiki oleh:** SHAHNAZ SASKIA PUTRI dan ALIA ARDANI
+
+**Gejala.**
+Berdasarkan aturan scope pada SPESIFIKASI.md bagian 4, setiap statement DELETE memiliki scope sendiri. Alias yang dideklarasikan pada DELETE hanya berlaku dalam lingkup statement tersebut dan tidak boleh digunakan oleh statement berikutnya yang berdiri sendiri.
+
+Pada kode lama, alias s yang dideklarasikan melalui DELETE FROM sesi s masih dapat ditemukan ketika resolver memproses SELECT setelahnya. Akibatnya, penggunaan s.id pada SELECT tidak menghasilkan diagnostic alias tidak terdefinisi, meskipun SELECT tersebut hanya mendeklarasikan sumber pengguna dengan alias u.
+
+Perilaku ini menyebabkan referensi kolom pada statement berikutnya dapat diarahkan ke tabel dari statement sebelumnya. Bug tetap perlu diperbaiki walaupun CRUD matrix tidak berubah, karena hasil resolusi nama dan diagnostic tidak sesuai dengan aturan scope.
+
+**Reproduksi minimal.** SQL
+```
+DELETE FROM sesi s;
+SELECT s.id FROM pengguna u;
+```
+Pada kode lama, scope DELETE masih tersimpan ketika SELECT diproses. Resolver kemudian menemukan alias s dari DELETE dan mengarahkan s.id pada SELECT ke tabel sesi.
+
+Hasil yang diharapkan adalah diagnostic berlevel error pada baris 2 dengan pesan:
+'alias 's' tidak terdefinisi'
+Diagnostic tersebut diperlukan karena alias s hanya dideklarasikan dalam DELETE. Pada SELECT berikutnya, alias yang tersedia adalah u.
+
+**Akar masalah.**
+Masalah terdapat pada fungsi _delete() dalam crud/resolver.py. Kode lama membuka scope baru melalui _push(), mendaftarkan tabel dan alias DELETE melalui _declare_source(), kemudian memproses kondisi WHERE melalui _expr(). Namun, setelah pemrosesan selesai, fungsi tidak memanggil _pop() untuk keluar dari scope DELETE.
+
+Akibatnya, self.scope masih menunjuk pada scope DELETE. Ketika SELECT berikutnya memanggil _push(), scope baru SELECT dibuat dengan scope DELETE yang tertinggal sebagai parent. Hubungan tersebut membuat dua statement yang sebenarnya terpisah diperlakukan seolah-olah memiliki hubungan scope bertingkat.
+
+Saat resolver mencari alias s melalui _lookup(), pencarian dapat mencapai scope DELETE yang masih berada dalam rantai scope. Alias tersebut kemudian dianggap tersedia, padahal masa berlakunya seharusnya sudah berakhir.
+
+Masalah ini berkaitan dengan konsep pengelolaan scope pada Crafting Interpreters Bab 11. Resolver perlu membuka scope saat memasuki suatu lingkup dan menutupnya setelah pemrosesan lingkup selesai. Ketidakseimbangan antara pembukaan dan penutupan scope menyebabkan deklarasi dari lingkup sebelumnya memengaruhi resolusi nama pada lingkup berikutnya.
+
+**Perbaikan.**
+Perubahan dilakukan pada fungsi _delete() dalam crud/resolver.py dengan menambahkan self._pop() setelah pemanggilan self._expr(dele.where). Fungsi setelah perbaikan menjadi:
+```
+def _delete(self, dele: ast.Delete) -> None:
+    self._push()
+    self._declare_source(dele.table)
+    self._expr(dele.where)
+    self._pop()
+```
+Pemanggilan _pop() ditempatkan setelah pemrosesan WHERE agar tabel dan alias DELETE tetap tersedia ketika kondisi DELETE diperiksa. Setelah pemeriksaan selesai, _pop() mengembalikan scope aktif ke parent-nya sehingga scope DELETE tidak menjadi lingkungan bagi statement berikutnya.
+
+Perbaikan menggunakan fungsi pengelolaan scope yang sudah tersedia dan mengikuti pola yang telah digunakan oleh _select() serta _update(). Perubahan tidak memerlukan penambahan struktur AST maupun perubahan API publik.
+
+Alternatif perbaikan adalah mengatur self.scope langsung menjadi None setelah DELETE selesai. Cara tersebut tidak digunakan karena _pop() lebih tepat dalam mengembalikan keadaan scope sebelumnya. Mengatur scope menjadi None secara langsung mengabaikan hubungan parent yang sudah dikelola oleh struktur Scope.
+
+**Test regresi.**
+Test test_alias_delete_tidak_bocor_ke_statement_berikutnya ditambahkan dalam tests/test_tambahan.py dengan input:
+```
+DELETE FROM sesi s WHERE s.id = 1;
+SELECT s.id FROM pengguna u;
+```
+Input tersebut menggunakan alias s secara sah pada kondisi DELETE, kemudian menggunakan alias yang sama pada SELECT berikutnya tanpa mendeklarasikannya kembali. Test mengambil pesan dari hasil.diagnostics dan memeriksa keberadaan pesan yang menyebut alias 's'. Pemeriksaan ini digunakan untuk mendeteksi apakah resolver melaporkan penggunaan alias yang sudah tidak berlaku.
+
+Pengujian dilakukan menggunakan perintah:
+```
+python -m pytest tests/test_tambahan.py::test_alias_delete_tidak_bocor_ke_statement_berikutnya -v
+```
+
+Hasil pengujian setelah perbaikan adalah: 1 passed in 0.20s
+Hasil tersebut menunjukkan bahwa test regresi Bug 6 lulus pada kode yang sudah memiliki _pop()
+
+**Peran AI.**
+AI turut membantu menjelaskan kesalahan lokasi folder ketika pytest belum menemukan file test, menyarankan penguatan pemeriksaan diagnostic, serta menyusun draf laporan berdasarkan kode dan hasil pengujian yang tersedia.
 
 
 
