@@ -196,3 +196,12 @@ def test_subquery_di_update_hanya_dibaca():
         "UPDATE pelanggan SET aktif = 0 WHERE id IN (SELECT pelanggan_id FROM pesanan);"
     )
     assert hasil.matrix() == {"pelanggan": "U", "pesanan": "R"}
+
+#Bug 6
+def test_alias_delete_tidak_bocor_ke_statement_berikutnya():
+    hasil = analyze_source(
+        "DELETE FROM sesi s WHERE s.id = 1;\n"
+        "SELECT s.id FROM pengguna u;"
+    )
+    pesan = [d.message for d in hasil.diagnostics]
+    assert any("'s'" in m for m in pesan)
