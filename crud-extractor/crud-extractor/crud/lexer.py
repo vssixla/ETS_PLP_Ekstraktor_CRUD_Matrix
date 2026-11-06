@@ -2,9 +2,6 @@
 from dataclasses import dataclass
 from enum import Enum, auto
 
-from pandas import col
-
-
 class TokenType(Enum):
     KEYWORD = auto()
     IDENT = auto()
@@ -118,9 +115,15 @@ class Lexer:
             self._add(TokenType.OP, ch, line, col)
             return
         if ch == "<":
-            op = "<=" if self._match("=") else "<"
+            if self._match("="):
+                op = "<="
+            elif self._match(">"):
+                op = "<>"
+            else:
+                op = "<"
             self._add(TokenType.OP, op, line, col)
             return
+        
         if ch == ">":
             op = ">=" if self._match("=") else ">"
             self._add(TokenType.OP, op, line, col)

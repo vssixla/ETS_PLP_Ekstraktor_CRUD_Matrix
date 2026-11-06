@@ -5,6 +5,8 @@ Isi dengan:
    lulus sesudahnya). Beri nama yang menjelaskan bug-nya.
 2. Lima test kasus tepi, masing-masing dengan komentar singkat mengapa kasus itu berisiko.
 """
+
+#test untuk Bug 1
 from crud.pipeline import analyze_source
 from crud.lexer import tokenize
 
@@ -42,8 +44,24 @@ def test_recovery_memproses_statement_setelah_error():
         "keranjang": "D",
     }
 
-
+#Bug 2
 def test_keyword_huruf_campuran():
     toks = tokenize("Select x FrOm t")
     assert toks[0].value == "SELECT"
     assert toks[2].value == "FROM"
+
+#Bug 2
+def test_operator_tidak_sama_dipindai_sebagai_satu_token():
+    from crud.lexer import TokenType, tokenize
+
+    tokens = tokenize("a <> 10")
+
+    assert [
+        (token.type, token.value)
+        for token in tokens
+    ] == [
+        (TokenType.IDENT, "a"),
+        (TokenType.OP, "<>"),
+        (TokenType.NUMBER, "10"),
+        (TokenType.EOF, ""),
+    ]
