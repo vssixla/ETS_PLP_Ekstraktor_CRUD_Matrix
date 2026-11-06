@@ -195,6 +195,6 @@ class Resolver:
         if len(entries) == 1:
             col.resolved = _target_of(entries[0])
         elif len(entries) > 1:
-            self._warning("ambigu tanpa skema", col.line)
+            self._warning(f"kolom '{col.name}' ambigu tanpa skema", col.line)
         else:
             self._warning("kolom tanpa tabel dalam scope", col.line)
