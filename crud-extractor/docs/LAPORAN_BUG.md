@@ -456,6 +456,65 @@ Hasil tersebut menunjukkan bahwa test regresi Bug 6 lulus pada kode yang sudah m
 AI turut membantu menjelaskan kesalahan lokasi folder ketika pytest belum menemukan file test, menyarankan penguatan pemeriksaan diagnostic, serta menyusun draf laporan berdasarkan kode dan hasil pengujian yang tersedia.
 
 
+## BUG 7: ALIAS SCOPE LUAR MENGALAHKAN ALIAS SCOPE DALAM
+**Ditemukan oleh:** ALIA ARDANI · **Diperbaiki oleh:** ALIA ARDANI
+
+**Gejala.**
+Berdasarkan aturan scope pada SPESIFIKASI.md bagian 4, pencarian alias harus dimulai dari scope terdalam menuju scope terluar. Jika alias yang sama digunakan pada query luar dan subquery, alias dalam harus menutupi alias luar. Aturan ini disebut shadowing.
+
+Pada kode lama, resolver justru memilih alias dari query luar terlebih dahulu. Ketika query luar menggunakan alias x untuk tabel pelanggan dan subquery menggunakan alias x untuk tabel pesanan, kolom x.id pada subquery salah diarahkan ke pelanggan. Seharusnya, kolom tersebut diarahkan ke pesanan.
+
+**Reproduksi minimal.** SQL
+```
+SELECT x.id FROM pelanggan x
+WHERE EXISTS (SELECT x.id FROM pesanan x);
+```
+Pada kode lama, x.id pada query luar maupun subquery sama-sama teresolusi ke pelanggan. Hasil yang diharapkan adalah x.id pada query luar teresolusi ke pelanggan, sedangkan x.id pada subquery teresolusi ke pesanan.
+
+Query ini valid dan tidak seharusnya menghasilkan diagnostic. Penggunaan alias yang sama diperbolehkan karena kedua alias dideklarasikan dalam scope yang berbeda.
+
+**Akar masalah.**
+Masalah terdapat pada fungsi _lookup() dalam crud/resolver.py. Fungsi tersebut membangun daftar chain mulai dari scope yang sedang aktif, kemudian mengikuti parent hingga scope terluar. Dengan demikian, urutan chain sebenarnya sudah sesuai untuk pencarian alias, yaitu dari dalam ke luar.
+
+Namun, kode lama menelusuri daftar tersebut menggunakan:
+```
+for scope in reversed(chain):
+```
+Penggunaan reversed() membalik urutan pencarian menjadi dari luar ke dalam. Karena fungsi langsung mengembalikan entry pertama yang cocok, alias x dari tabel pelanggan ditemukan dan dikembalikan sebelum alias x dari tabel pesanan diperiksa.
+
+Masalah ini berkaitan dengan konsep resolusi nama dan shadowing dalam Crafting Interpreters Bab 11. Nama harus dihubungkan dengan deklarasi yang paling dekat dengan tempat penggunaannya. Pencarian dari scope terluar melanggar aturan tersebut karena deklarasi luar mengalahkan deklarasi dalam.
+
+**Perbaikan.**
+Perubahan dilakukan pada fungsi _lookup() dalam crud/resolver.py dengan mengganti menjadi:
+```
+for scope in chain:
+```
+Perubahan ini membuat resolver mengikuti urutan chain yang sudah dimulai dari scope terdalam. Jika alias ditemukan pada scope tersebut, resolver langsung mengembalikan entry-nya. Jika tidak ditemukan, pencarian dilanjutkan ke scope luar.
+
+Pencarian ke scope luar tetap dipertahankan karena subquery dapat menggunakan alias dari query luar apabila alias tersebut tidak dideklarasikan di dalam subquery. Oleh karena itu, alternatif membatasi pencarian hanya pada scope terdalam tidak dipilih karena akan menghalangi resolusi referensi berkorelasi.
+
+Perbaikan hanya mengubah urutan pencarian alias tanpa mengubah struktur AST maupun API publik.
+
+**Test regresi.**
+Test test_alias_dalam_menutupi_alias_luar ditambahkan dalam tests/test_tambahan.py. Test menggunakan query luar dan subquery yang sama-sama memakai alias x, tetapi merujuk pada tabel berbeda.
+
+Test memeriksa bahwa parsing selesai tanpa kesalahan dan resolver tidak menghasilkan diagnostic. Selanjutnya, test memeriksa atribut resolved pada kedua kolom untuk memastikan kolom luar diarahkan ke pelanggan dan kolom dalam diarahkan ke pesanan. Pemeriksaan dilakukan pada AST karena CRUD matrix saja belum dapat membuktikan ketepatan resolusi alias.
+
+Sebelum perbaikan, test dijalankan menggunakan:
+```
+python -m pytest tests/test_tambahan.py::test_alias_dalam_menutupi_alias_luar -v
+```
+Test menghasilkan FAILED pada pemeriksaan kolom dalam dengan pesan: AssertionError: assert 'pelanggan' == 'pesanan'
+
+Setelah perbaikan, test yang sama dijalankan bersama seluruh test resolver bawaan:
+```
+python -m pytest tests/test_resolver.py tests/test_tambahan.py::test_alias_dalam_menutupi_alias_luar -v
+```
+Hasil pengujian adalah: 5 passed in 0.18s
+Hasil tersebut menunjukkan bahwa test regresi yang sebelumnya gagal sudah lulus tanpa mengubah hasil yang diharapkan. Empat test resolver bawaan juga tetap lulus setelah urutan pencarian diperbaiki.
+
+**Peran AI.**
+AI membantu memvlidasi kesalahan penggunaan reversed(chain) pada fungsi _lookup(), menjelaskan pengaruhnya terhadap shadowing, serta memberikan gambaran dan membantu perbaikan kode pada test_alias_dalam_menutupi_alias_luar . 
 
 ## =============================================================================================================
 ## Bug 1: (judul singkat)

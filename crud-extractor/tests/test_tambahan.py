@@ -205,3 +205,28 @@ def test_alias_delete_tidak_bocor_ke_statement_berikutnya():
     )
     pesan = [d.message for d in hasil.diagnostics]
     assert any("'s'" in m for m in pesan)
+
+#Bug 7 
+def test_alias_dalam_menutupi_alias_luar():
+    from crud.parser import parse_sql
+    from crud.resolver import Resolver
+
+    sql = (
+        "SELECT x.id FROM pelanggan x "
+        "WHERE EXISTS (SELECT x.id FROM pesanan x);"
+    )
+
+    script = parse_sql(sql)
+    assert script.errors == []
+
+    diagnostics = Resolver().resolve_script(script)
+    assert diagnostics == []
+
+    select_luar = script.statements[0]
+    select_dalam = select_luar.where.query
+
+    kolom_luar = select_luar.columns[0].expr
+    kolom_dalam = select_dalam.columns[0].expr
+
+    assert kolom_luar.resolved == "pelanggan"
+    assert kolom_dalam.resolved == "pesanan"
