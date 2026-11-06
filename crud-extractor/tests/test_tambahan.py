@@ -231,7 +231,7 @@ def test_alias_dalam_menutupi_alias_luar():
     assert kolom_luar.resolved == "pelanggan"
     assert kolom_dalam.resolved == "pesanan"
 
-#BUG 8 
+# Bug 8
 def test_and_lebih_kuat_daripada_or():
     from crud import ast_nodes as ast
     from crud.parser import parse_sql
@@ -258,3 +258,13 @@ def test_and_lebih_kuat_daripada_or():
     assert kondisi.right.left.left.name == "b"
     assert kondisi.right.right.op == "="
     assert kondisi.right.right.left.name == "c"
+
+#Bug 9
+def test_left_outer_join_diterima():
+    from crud.parser import parse_sql
+
+    sql = "SELECT p.id FROM pelanggan p LEFT OUTER JOIN pesanan s ON p.id = s.id;"
+    script = parse_sql(sql)
+
+    assert script.errors == []
+    assert len(script.statements) == 1

@@ -173,10 +173,14 @@ class Parser:
     def _join(self) -> ast.Join:
         tok = self._peek()
         kind = "INNER"
+
         if self._match_kw("INNER"):
             kind = "INNER"
         elif self._match_kw("LEFT"):
             kind = "LEFT"
+            # OUTER boleh ada atau tidak setelah LEFT.
+            self._match_kw("OUTER")
+
         self._expect_kw("JOIN")
         source = self._table_ref()
         self._expect_kw("ON")
