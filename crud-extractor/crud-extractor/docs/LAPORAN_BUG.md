@@ -51,6 +51,46 @@ Sebelum perbaikan, test FAILED karena hasil hanya memuat statement SELECT pertam
 AI membantu saya untuk memvalidasi kalau temuan bug dan perbaikan yang akan temukan itu tepat dan sesuai dengan gejala pada bug ini, AI juga membantu saya melakukan dalam memperbaiki serta memberikan tambahan kode program dalam memperbaiki fungsi _synchronize() dan test_recovery_memproses_statement_setelah_error .
 
 
+## Bug 2: Keyword Huruf Kecil Tidak Dikenali sebagai KEYWORD
+
+**Ditemukan oleh:** SHAHNAZ SASKIA PUTRI · **Diperbaiki oleh:** SHAHNAZ SASKIA PUTRI
+
+**Gejala.**
+Berdasarkan SPESIFIKASI.md bagian 2.2, keyword tidak membedakan huruf besar dan kecil. Jadi, 'select', 'Select', dan 'SELECT' seharusnya dikenali sebagai token KEYWORD dengan nilai huruf kapital. Namun, pada kode lama, lexer mengenali select sebagai token IDENT dengan nilai 'select'. Akibatnya, test test_keyword_huruf_kecil gagal karena token pertama bertipe IDENT, bukan KEYWORD. Hal ini menyebabkan parser tidak dapat memproses query yang menggunakan keyword huruf kecil.
+
+
+**Reproduksi minimal.** SQL
+```
+select id from t
+```
+Seharusnya menghasilkan token KEYWORD 'SELECT', IDENT 'id', KEYWORD 'FROM', dan IDENT 't'. Namun, kode lama mengenali 'select' dan 'from' sebagai IDENT.
+
+
+**Akar masalah.**
+Lexer membaca satu kata utuh kemudian mencocokkannya dengan daftar KEYWORDS yang hanya berisi huruf kapital. Karena kode lama tidak mengubah huruf sebelum melakukan pencocokan, 'select' dianggap berbeda dari 'SELECT' dan akhirnya dikategorikan sebagai IDENT.
+
+Masalah ini berkaitan dengan konsep Reserved Words and Identifiers dalam Crafting Interpreters Bab 4, yaitu pencocokan lexeme dengan daftar keyword. Sesuai spesifikasi proyek, pencocokan harus dilakukan tanpa membedakan huruf besar dan kecil. Kesalahan lexer ini kemudian memengaruhi parser karena parser bergantung pada jenis token yang dihasilkan.
+
+
+**Perbaikan.**
+Perbaikan dilakukan pada file 'crud/lexer.py' tepatnya pada fungsi pembaca kata. Metode '.upper()' digunakan untuk mengubah kata menjadi huruf kapital sebelum dicocokkan dengan KEYWORDS dan saat menentukan nilai token KEYWORD.
+
+Untuk token IDENT, teks asli tetap dipertahankan karena normalisasi nama tabel, alias, dan kolom menjadi huruf kecil merupakan tugas parser sesuai SPESIFIKASI.md bagian 2.2.
+
+Alternatif yang dipertimbangkan adalah menambahkan berbagai variasi huruf keyword ke dalam daftar KEYWORDS. Namun, cara ini tidak dipilih karena akan menghasilkan terlalu banyak kombinasi penulisan. Penggunaan .upper() lebih sederhana dan sesuai dengan spesifikasi.
+
+
+**Test regresi.**
+Test test_keyword_huruf_campuran ditambahkan pada tests/test_tambahan.py untuk memastikan input Select x FrOm t menghasilkan nilai token SELECT dan FROM. Test bawaan test_keyword_huruf_kecil yang sebelumnya gagal karena tipe token IDENT berhasil dilewati setelah perbaikan. Jumlah test yang gagal pada seluruh suite juga berkurang dari 5 menjadi 4, sementara test tambahan berhasil dijalankan.
+
+
+**Peran AI.**
+Proses debugging dilakukan dengan bantuan AI yang memberikan arahan dalam menemukan penyebab bug dan menentukan perbaikannya. Selama proses tersebut, saya juga mempelajari setiap perubahan yang disarankan, kemudian hasil perbaikan diverifikasi dengan menjalankan test.
+
+
+
+
+
 
 ## Bug 1: (judul singkat)
 
