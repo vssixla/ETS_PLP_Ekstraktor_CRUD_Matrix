@@ -6,6 +6,7 @@ Isi dengan:
 2. Lima test kasus tepi, masing-masing dengan komentar singkat mengapa kasus itu berisiko.
 """
 from crud.pipeline import analyze_source
+from crud.lexer import tokenize
 
 def test_recovery_memproses_statement_setelah_error():
     sql = (
@@ -40,3 +41,9 @@ def test_recovery_memproses_statement_setelah_error():
         "produk": "U",
         "keranjang": "D",
     }
+
+
+def test_keyword_huruf_campuran():
+    toks = tokenize("Select x FrOm t")
+    assert toks[0].value == "SELECT"
+    assert toks[2].value == "FROM"
