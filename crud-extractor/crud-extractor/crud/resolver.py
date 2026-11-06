@@ -173,12 +173,26 @@ class Resolver:
         if col.qualifier is not None:
             entry = self._lookup(col.qualifier)
             if entry is None:
-                self._error(f"alias '{col.qualifier}' tidak terdefinisi", col.line)
+                self._error(
+                    f"alias '{col.qualifier}' tidak terdefinisi",
+                    col.line,
+                )
             else:
                 col.resolved = _target_of(entry)
             return
-        # TODO(T2): kolom tanpa qualifier (SPESIFIKASI.md bagian 4.3).
-        #   - tepat satu tabel di scope terdalam -> isi col.resolved
-        #   - lebih dari satu tabel              -> warning "ambigu tanpa skema"
-        #   - tidak ada tabel                    -> warning
-        pass
+
+        # Kolom tanpa qualifier hanya memakai scope terdalam.
+        entries = (
+            list(self.scope.entries.values())
+            if self.scope is not None
+            else []
+        )
+
+        col.resolved = None
+
+        if len(entries) == 1:
+            col.resolved = _target_of(entries[0])
+        elif len(entries) > 1:
+            self._warning("ambigu tanpa skema", col.line)
+        else:
+            self._warning("kolom tanpa tabel dalam scope", col.line)

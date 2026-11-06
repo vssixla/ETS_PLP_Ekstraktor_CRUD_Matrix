@@ -117,3 +117,74 @@ def test_string_kutip_ganda_menjadi_satu_token():
     toks = tokenize("'O''Brien'")
     assert len(toks) == 2          # satu STRING + EOF
     assert toks[0].value == "O'Brien"
+
+#TES TODO(T4)
+def test_t2_kolom_tanpa_qualifier():
+    from crud.parser import parse_sql
+    from crud.resolver import Resolver
+
+    kasus = [
+        # Satu sumber: kolom diarahkan ke pelanggan.
+        (
+            "SELECT nama FROM pelanggan;",
+            "pelanggan",
+            None,
+        ),
+        # Dua sumber: tidak boleh memilih salah satu.
+        (
+            "SELECT nama FROM pelanggan p, pesanan o;",
+            None,
+            "ambigu tanpa skema",
+        ),
+    ]
+
+    for sql, expected_table, expected_warning in kasus:
+        script = parse_sql(sql)
+        assert script.errors == [], sql
+
+        diagnostics = Resolver().resolve_script(script)
+        column = script.statements[0].columns[0].expr
+
+        assert column.resolved == expected_table, sql
+
+        if expected_warning is None:
+            assert diagnostics == [], sql
+        else:
+            assert len(diagnostics) == 1, sql
+            assert diagnostics[0].level == "warning", sql
+            assert expected_warning in diagnostics[0].message, sql
+            assert diagnostics[0].line == 1, sql
+
+#TES TODO(T4) 2
+def test_t2_kolom_tanpa_qualifier_scope_kosong():
+    from crud.parser import parse_sql
+    from crud.resolver import Resolver, Scope, ScopeEntry
+
+    # Ambil node kolom dari SQL yang diterima parser.
+    script = parse_sql("SELECT nama FROM pelanggan;")
+    assert script.errors == []
+
+    column = script.statements[0].columns[0].expr
+
+    # Scope luar memiliki tabel pelanggan.
+    outer_scope = Scope()
+    outer_scope.entries["pelanggan"] = ScopeEntry(
+        name="pelanggan",
+        table="pelanggan",
+        line=1,
+    )
+
+    # Scope terdalam sengaja dibuat kosong untuk menguji aturan T2.
+    resolver = Resolver()
+    resolver.scope = Scope(parent=outer_scope)
+
+    resolver._column(column)
+
+    # Tidak boleh mengambil tabel dari scope luar.
+    assert column.resolved is None
+    assert len(resolver.diagnostics) == 1
+
+    diagnostic = resolver.diagnostics[0]
+    assert diagnostic.level == "warning"
+    assert "tanpa tabel" in diagnostic.message
+    assert diagnostic.line == 1
