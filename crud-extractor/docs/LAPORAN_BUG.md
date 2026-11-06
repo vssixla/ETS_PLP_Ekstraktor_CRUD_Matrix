@@ -6,7 +6,8 @@ sendiri dan memakai konsep dari *Crafting Interpreters* (sebutkan bab). Bagian i
 ---
 
 ## TODO T1: Melengkapi Dukungan INSERT ... SELECT
-Ditemukan oleh: ALIA ARDANI dan SHAHNAZ SASKIA PUTRI, berdasarkan penanda TODO(T1) pada kode awal · Diperbaiki oleh: ALIA ARDANI
+**Ditemukan oleh:** ALIA ARDANI dan SHAHNAZ SASKIA PUTRI, berdasarkan penanda TODO(T1) pada kode awal · 
+**Diperbaiki oleh:** ALIA ARDANI
 
 **Gejala.** 
 Program belum dapat memproses perintah INSERT yang mengambil data dari hasil query SELECT. Ketika menerima bentuk tersebut, parser menghasilkan pesan:
@@ -82,8 +83,9 @@ Sebelum perbaikan, test bawaan test_insert_select telah terbukti gagal dengan pe
 AI membantu menjelaskan tujuan TODO(T1), menyarankan pemanggilan _select() dari _insert(), memberikan contoh pembentukan node AST INSERT. AI juga membantu memperbaiki kesalahan saat penyusunan kode, terutama kesalahan ppercabangan if pada "if self._check_kw("SELECT"):" dan membantu validasi kode program untuk test TODO T1 dengan memberikan rekomendasi tambahan kode program untuk test ini.
 
 
-## TODO T2: Melengkapi Resolusi Kolom Tanpa Qualifier
-Ditemukan oleh: ALIA ARDANI dan SHAHNAZ SASKIA PUTRI, berdasarkan penanda TODO(T2) pada kode awal · Diperbaiki oleh: ALIA ARDANI
+## TODO T2: MELENGKAPI RESOLUSI KOLOM TANPA QUALIFIER
+**Ditemukan oleh:** ALIA ARDANI dan SHAHNAZ SASKIA PUTRI, berdasarkan penanda TODO(T2) pada kode awal · 
+**Diperbaiki oleh:** ALIA ARDANI
 
 **Gejala.** 
 Resolver belum dapat menentukan sumber tabel untuk kolom yang ditulis tanpa qualifier. Qualifier adalah nama tabel atau alias yang diletakkan sebelum nama kolom, seperti p pada p.nama. Pada query SELECT nama FROM pelanggan WHERE aktif = 1;, kolom nama dan aktif tidak memiliki qualifier, tetapi query hanya memiliki satu sumber tabel, yaitu pelanggan. Kedua kolom tersebut seharusnya dapat diarahkan ke tabel pelanggan.
@@ -133,8 +135,9 @@ Hasil pengujian menunjukkan 6 passed in 0.23s. Bukti kegagalan sebelum perbaikan
 AI membantu saya memperbaiki kesalahan kode program fungsi _column() pada bagian TODO(T2) dan program pada test tambahan. Awalnya, saya hanya menambahkan test_t2_kolom_tanpa_qualifier, tetapi contoh input SELECT nama; yang disarankan AI ternyata tidak sesuai dengan grammar proyek karena parser mewajibkan FROM. AI kemudian menyarankan penambahan test_t2_kolom_tanpa_qualifier_scope_kosong untuk menguji kondisi scope kosong secara langsung pada resolver.
 
 
-## TODO T3: Dukungan Komentar Blok
-Ditemukan oleh: ALIA ARDANI dan SHAHNAZ SASKIA PUTRI, berdasarkan penanda TODO(T3) pada kode awal · Diperbaiki oleh: SHAHNAZ SASKIA PUTRI
+## TODO T3: DUKUNGAN KOMENTAR BLOK
+**Ditemukan oleh:** SHAHNAZ SASKIA PUTRI dan ALIA ARDANI, berdasarkan penanda TODO(T3) pada kode awal · 
+**Diperbaiki oleh:** SHAHNAZ SASKIA PUTRI
 
 **Gejala.** 
 Berdasarkan SPESIFIKASI.md bagian 2.3, komentar blok /* ... */ dapat terdiri dari beberapa baris, boleh mengandung karakter *, tidak boleh bersarang, tidak menghasilkan token, dan harus menghasilkan LexError jika tidak ditutup.
@@ -157,8 +160,9 @@ Sebelum perbaikan, test bawaan test_komentar_blok gagal dengan pesan LexError: k
 AI membantu memberikan arahan mengenai proses pemindaian komentar blok serta menyarankan contoh kode ketika saya mengalami kesulitan dalam implementasinya. Selama proses tersebut, saya juga mempelajari perubahan yang disarankan agar memahami cara kerja perbaikannya. Setelah itu, saya menjalankan test bawaan, menambahkan test tambahan, dan menguji seluruh test suite untuk memastikan perbaikan berjalan dengan baik.
 
 
-## Bug 1: Parser Membuang Statement Valid setelah Kesalahan Sintaks
-**Ditemukan oleh:** ALIA ARDANI dan SHAHNAZ SASKIA PUTRI · **Diperbaiki oleh:** ALIA ARDANI
+## BUG 1: PARSER MEMBUANG STATEMENT VALID SETELAH KESALAHAN SINTAKS
+**Ditemukan oleh:** ALIA ARDANI dan SHAHNAZ SASKIA PUTRI · 
+**Diperbaiki oleh:** ALIA ARDANI
 
 **Gejala.** 
 Pada file campuran_error.sql, statement SELECT di baris 4 mengandung kesalahan sintaks. Program melaporkan kesalahan tersebut, tetapi hanya memproses SELECT pertama di baris 2. Statement UPDATE di baris 6 dan DELETE di baris 8 yang valid ikut terlewat.
@@ -203,9 +207,9 @@ Sebelum perbaikan, test FAILED karena hasil hanya memuat statement SELECT pertam
 AI membantu saya untuk memvalidasi kalau temuan bug dan perbaikan yang akan temukan itu tepat dan sesuai dengan gejala pada bug ini, AI juga membantu saya melakukan dalam memperbaiki serta memberikan tambahan kode program dalam memperbaiki fungsi _synchronize() dan test_recovery_memproses_statement_setelah_error .
 
 
-## Bug 2: Keyword Huruf Kecil Tidak Dikenali sebagai KEYWORD
-
-**Ditemukan oleh:** ALIA ARDANI dan SHAHNAZ SASKIA PUTRI · **Diperbaiki oleh:** SHAHNAZ SASKIA PUTRI
+## BUG 2: KEYWORD HURUF KECIL TIDAK DIKENALI SEBAGAI KEYWORD
+**Ditemukan oleh:** SHAHNAZ SASKIA PUTRI dan ALIA ARDANI · 
+**Diperbaiki oleh:** SHAHNAZ SASKIA PUTRI
 
 **Gejala.**
 Berdasarkan SPESIFIKASI.md bagian 2.2, keyword tidak membedakan huruf besar dan kecil. Jadi, 'select', 'Select', dan 'SELECT' seharusnya dikenali sebagai token KEYWORD dengan nilai huruf kapital. Namun, pada kode lama, lexer mengenali select sebagai token IDENT dengan nilai 'select'. Akibatnya, test test_keyword_huruf_kecil gagal karena token pertama bertipe IDENT, bukan KEYWORD. Hal ini menyebabkan parser tidak dapat memproses query yang menggunakan keyword huruf kecil.
@@ -235,9 +239,9 @@ Test test_keyword_huruf_campuran ditambahkan pada tests/test_tambahan.py untuk m
 Proses debugging dilakukan dengan bantuan AI yang memberikan arahan dalam menemukan penyebab bug dan menentukan perbaikannya. Selama proses tersebut, saya juga mempelajari setiap perubahan yang disarankan, kemudian hasil perbaikan diverifikasi dengan menjalankan test.
 
 
-## Bug 3: Parser Membuang Statement Valid setelah Kesalahan Sintaks
-
-**Ditemukan oleh:** ALIA ARDANI dan SHAHNAZ SASKIA PUTRI · **Diperbaiki oleh:** ALIA ARDANI
+## BUG 3: OPERATOR TIDAK SAMA DENGAN (<>) DIPECAH MENJADI DUA TOKEN
+**Ditemukan oleh:** ALIA ARDANI dan SHAHNAZ SASKIA PUTRI · 
+**Diperbaiki oleh:** ALIA ARDANI
 
 **Gejala.** 
 Pada file laporan_penjualan.sql, terdapat kondisi berikut pada baris 6:
@@ -332,8 +336,9 @@ Hasil tersebut membuktikan bahwa kasus <> yang diuji sudah benar dan operator pa
 AI membantu menghubungkan pesan parse error pada laporan_penjualan.sql dengan kesalahan pembentukan token operator <>. AI juga membantu menyusun test regresi, menjelaskan konsep lookahead dan maximal munch, serta menyarankan perubahan pada fungsi _scan_token().
 
 
-## Bug 4: Kutip Ganda di Dalam String Memecah Satu String Menjadi Dua Token
-**Ditemukan oleh:** SHAHNAZ SASKIA PUTRI · **Diperbaiki oleh:** SHAHNAZ SASKIA PUTRI
+## BUG 4: KUTIP GANDA DI DALAM STRING MEMECAH SATU STRING MENJADI DUA TOKEN 
+**Ditemukan oleh:** SHAHNAZ SASKIA PUTRI dan ALIA ARDANI · 
+**Diperbaiki oleh:** SHAHNAZ SASKIA PUTRI
 
 **Gejala.**
 Berdasarkan SPESIFIKASI.md bagian 2.4, dua kutip tunggal berurutan ('') di dalam string harus dianggap sebagai satu karakter kutip. Contoh 'O''Brien' seharusnya menghasilkan satu token STRING dengan nilai O'Brien.
@@ -361,8 +366,9 @@ Sebelum perbaikan, test gagal dengan pesan assert 3 == 2. Setelah perbaikan, tes
 AI membantu memberikan arahan dalam memperbaiki fungsi _string serta menyarankan bentuk test untuk menguji bug. Saya mengikuti arahan tersebut sambil mempelajari cara kerja dan memahami perubahan yang dilakukan.
 
 
-## Bug 5: Tabel di Subquery pada UPDATE Salah Ditandai U
-**Ditemukan oleh:** ALIA ARDANI dan SHAHNAZ SASKIA PUTRI · **Diperbaiki oleh:** SHAHNAZ SASKIA PUTRI dan ALIA ARDANI
+## BUG 5: TABEL DI SUBQUERY PADA UPDATE SALAH DITANDAI U
+**Ditemukan oleh:** SHAHNAZ SASKIA PUTRI dan ALIA ARDANI · 
+**Diperbaiki oleh:** SHAHNAZ SASKIA PUTRI dan ALIA ARDANI
 
 **Gejala.**
 Menurut SPESIFIKASI.md bagian 5, tabel yang dibaca lewat subquery selalu berstatus R, apa pun jenis statement luarnya, dan hanya tabel target UPDATE yang berstatus U. Pada kode lama, tabel di dalam subquery pada klausa `SET` maupun `WHERE` ikut ditandai U. Test yang saya tulis gagal karena `pesanan` keluar `U`, padahal seharusnya `R`. Test bawaan `test_matrix_laporan_penjualan` juga gagal karena alasan yang sama (`pesanan` keluar `RUD`, seharusnya `RD`).
@@ -391,8 +397,8 @@ AI menunjukkan lokasi kode yang perlu diperiksa dan mengusulkan perubahan `"U"` 
 
 
 ## BUG 6: ALIAS DELETE BOCOR KE STATEMENT BERIKUTNYA
-**Ditemukan oleh:** ALIA ARDANI dan SHAHNAZ SASKIA PUTRI · 
-**Diperbaiki oleh:** SHAHNAZ SASKIA PUTRI dan ALIA ARDANI
+**Ditemukan oleh:** SHAHNAZ SASKIA PUTRI dan ALIA ARDANI · 
+**Diperbaiki oleh:** SHAHNAZ SASKIA PUTRI
 
 **Gejala.**
 Berdasarkan aturan scope pada SPESIFIKASI.md bagian 4, setiap statement DELETE memiliki scope sendiri. Alias yang dideklarasikan pada DELETE hanya berlaku dalam lingkup statement tersebut dan tidak boleh digunakan oleh statement berikutnya yang berdiri sendiri.
@@ -457,7 +463,8 @@ AI turut membantu menjelaskan kesalahan lokasi folder ketika pytest belum menemu
 
 
 ## BUG 7: ALIAS SCOPE LUAR MENGALAHKAN ALIAS SCOPE DALAM
-**Ditemukan oleh:** ALIA ARDANI · **Diperbaiki oleh:** ALIA ARDANI
+**Ditemukan oleh:** ALIA ARDANI dan SHAHNAZ SASKIA PUTRI · 
+**Diperbaiki oleh:** ALIA ARDANI
 
 **Gejala.**
 Berdasarkan aturan scope pada SPESIFIKASI.md bagian 4, pencarian alias harus dimulai dari scope terdalam menuju scope terluar. Jika alias yang sama digunakan pada query luar dan subquery, alias dalam harus menutupi alias luar. Aturan ini disebut shadowing.
@@ -515,6 +522,67 @@ Hasil tersebut menunjukkan bahwa test regresi yang sebelumnya gagal sudah lulus 
 
 **Peran AI.**
 AI membantu memvlidasi kesalahan penggunaan reversed(chain) pada fungsi _lookup(), menjelaskan pengaruhnya terhadap shadowing, serta memberikan gambaran dan membantu perbaikan kode pada test_alias_dalam_menutupi_alias_luar . 
+
+
+## BUG 8: PARSER MENYAMAKAN PRESEDENSI AND DAN OR
+**Ditemukan oleh:** ALIA ARDANI dan SHAHNAZ SASKIA PUTRI · 
+**Diperbaiki oleh:** ALIA ARDANI
+
+**Gejala.**
+Menurut SPESIFIKASI.md bagian 3.1, operator AND memiliki presedensi lebih tinggi daripada OR. Namun, parser lama memproses keduanya pada tingkat yang sama. Query berhasil diparsing tanpa error, tetapi pengelompokan kondisi pada AST salah.
+
+**Reproduksi minimal.** 
+```
+SELECT id FROM t WHERE a = 1 OR b = 2 AND c = 3;
+```
+AST kode lama menggambarkan (a = 1 OR b = 2) AND c = 3. Hasil yang diharapkan adalah a = 1 OR (b = 2 AND c = 3), sehingga akar ekspresinya berupa OR dan cabang kanannya berupa AND.
+
+**Akar masalah.**
+Fungsi _logical() dalam crud/parser.py memproses AND dan OR dalam satu perulangan:
+```
+while self._check_kw("AND", "OR"):
+    op = self._advance().value
+    left = ast.BinaryOp(left, op, self._not())
+```
+Setiap operasi baru menggunakan hasil sebelumnya sebagai operand kiri. Akibatnya, ekspresi dikelompokkan dari kiri ke kanan tanpa membedakan prioritas kedua operator.
+
+Masalah ini berkaitan dengan Crafting Interpreters Bab 6 bagian 6.1, yang menjelaskan pemisahan aturan grammar untuk setiap tingkat presedensi. Bagian 6.2 menjelaskan bahwa setiap aturan tersebut diterjemahkan menjadi fungsi dalam parser recursive descent. Konsep ini digunakan untuk menerapkan urutan presedensi yang ditetapkan spesifikasi proyek.
+
+**Perbaikan.**
+Perubahan dilakukan dalam crud/parser.py. Fungsi _logical() diubah agar hanya menangani OR, dan fungsi _and() ditambahkan untuk menangani AND.
+```
+def _logical(self):
+    # OR memiliki presedensi lebih rendah daripada AND.
+    left = self._and()
+    while self._check_kw("OR"):
+        op = self._advance().value
+        left = ast.BinaryOp(left, op, self._and())
+    return left
+
+def _and(self):
+    # AND memiliki presedensi lebih rendah daripada NOT.
+    left = self._not()
+    while self._check_kw("AND"):
+        op = self._advance().value
+        left = ast.BinaryOp(left, op, self._not())
+    return left
+```
+Fungsi _expr() tetap memanggil _logical(). Pemisahan ini membuat operasi AND terbentuk sebagai operand OR, sehingga pengelompokan AST sesuai dengan spesifikasi.
+
+Alternatifnya adalah menggunakan satu fungsi dengan tabel prioritas operator. Cara tersebut tidak dipilih karena pemisahan fungsi cukup untuk memperbaiki masalah dan sesuai dengan pola recursive descent pada Bab 6.
+
+**Test regresi.**
+Test test_and_lebih_kuat_daripada_or ditambahkan dalam tests/test_tambahan.py. Test memeriksa parsing tanpa error, akar ekspresi berupa OR, cabang kiri berupa perbandingan kolom a, dan cabang kanan berupa AND yang menghubungkan perbandingan kolom b dan c.
+
+Perintah pengujian:
+```
+python -m pytest tests/test_tambahan.py::test_and_lebih_kuat_daripada_or -v
+```
+Sebelum perbaikan, test menghasilkan 1 failed in 0.62s karena akar ekspresi berupa AND, bukan OR. Setelah perbaikan, test yang sama menghasilkan 1 passed in 0.13s tanpa mengubah isi test.
+
+**Peran AI.**
+AI membantu dalam menemukan penyebab keselahan logika pada fungsi sebelumnya, membantu dalam memperbaiki test pemeriksaan AST, dan menyarankan pemisahan fungsi _logical() dan _and(). AI juga membantu saya dalam keslahan logical ini pada konsep teori.
+
 
 ## =============================================================================================================
 ## Bug 1: (judul singkat)

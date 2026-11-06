@@ -230,3 +230,31 @@ def test_alias_dalam_menutupi_alias_luar():
 
     assert kolom_luar.resolved == "pelanggan"
     assert kolom_dalam.resolved == "pesanan"
+
+#BUG 8 
+def test_and_lebih_kuat_daripada_or():
+    from crud import ast_nodes as ast
+    from crud.parser import parse_sql
+
+    script = parse_sql(
+        "SELECT id FROM t WHERE a = 1 OR b = 2 AND c = 3;"
+    )
+
+    assert script.errors == []
+
+    kondisi = script.statements[0].where
+
+    # Pengelompokan yang benar: a = 1 OR (b = 2 AND c = 3).
+    assert isinstance(kondisi, ast.BinaryOp)
+    assert kondisi.op == "OR"
+
+    assert isinstance(kondisi.left, ast.BinaryOp)
+    assert kondisi.left.op == "="
+    assert kondisi.left.left.name == "a"
+
+    assert isinstance(kondisi.right, ast.BinaryOp)
+    assert kondisi.right.op == "AND"
+    assert kondisi.right.left.op == "="
+    assert kondisi.right.left.left.name == "b"
+    assert kondisi.right.right.op == "="
+    assert kondisi.right.right.left.name == "c"

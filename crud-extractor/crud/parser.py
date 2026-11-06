@@ -257,9 +257,17 @@ class Parser:
         return self._logical()
 
     def _logical(self):
-        # OR dan AND: operator logika biner, asosiatif kiri.
+        # OR memiliki presedensi lebih rendah daripada AND.
+        left = self._and()
+        while self._check_kw("OR"):
+            op = self._advance().value
+            left = ast.BinaryOp(left, op, self._and())
+        return left
+
+    def _and(self):
+        # AND memiliki presedensi lebih rendah daripada NOT.
         left = self._not()
-        while self._check_kw("AND", "OR"):
+        while self._check_kw("AND"):
             op = self._advance().value
             left = ast.BinaryOp(left, op, self._not())
         return left
