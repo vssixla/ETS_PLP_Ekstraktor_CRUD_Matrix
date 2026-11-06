@@ -50,7 +50,7 @@ def test_keyword_huruf_campuran():
     assert toks[0].value == "SELECT"
     assert toks[2].value == "FROM"
 
-#Bug 2
+#Bug 3
 def test_operator_tidak_sama_dipindai_sebagai_satu_token():
     from crud.lexer import TokenType, tokenize
 
