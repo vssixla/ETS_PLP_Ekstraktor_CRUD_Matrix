@@ -714,7 +714,7 @@ AI membantu menemukan pembatasan karakter pertama parameter, memberikan gambaran
 
 ## BUG 11: DIAGNOSTIK RESOLVER TERBAWA KE SCRIPT BERIKUTNYA
 **Ditemukan oleh:** ALIA ARDANI dan SHAHNAZ SASKIA PUTRI · 
-**Diperbaiki oleh:** ALIA ARDANI
+**Diperbaiki oleh:** ALIA ARDANI dan SHAHNAZ SASKIA PUTRI
 
 **Gejala.**
 Ketika satu objek Resolver digunakan untuk memproses dua script secara berurutan, diagnostik dari script pertama ikut muncul pada hasil script kedua. Akibatnya, script kedua yang valid tetap dilaporkan memiliki error.
