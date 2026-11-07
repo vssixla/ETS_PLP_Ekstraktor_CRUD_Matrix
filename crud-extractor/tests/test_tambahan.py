@@ -268,3 +268,16 @@ def test_left_outer_join_diterima():
 
     assert script.errors == []
     assert len(script.statements) == 1
+
+#Bug 10
+def test_parameter_berawalan_angka():
+    from crud.lexer import tokenize, TokenType
+
+    tokens = tokenize(":1")
+
+    assert len(tokens) == 2
+    assert tokens[0].type == TokenType.PARAM
+    assert tokens[0].value == ":1"
+    assert tokens[0].line == 1
+    assert tokens[0].col == 1
+    assert tokens[1].type == TokenType.EOF

@@ -146,7 +146,7 @@ class Lexer:
             self._add(TokenType.PARAM, "?", line, col)
             return
         if ch == ":":
-            if self._peek().isalpha() or self._peek() == "_":
+            if self._peek().isalnum() or self._peek() == "_":
                 start = self.pos
                 while self._peek().isalnum() or self._peek() == "_":
                     self._advance()

@@ -652,6 +652,65 @@ Hasilnya 1 failed in 0.55s, dengan pesan bahwa parser mengharapkan JOIN tetapi m
 AAI membantu saya dalam menemukan bug ini, membantu memperbaiki kode program untuk perbaikan fungsi dan kede program untuk test, AI juga menunjukkan bagian fungsi _join() yang menyebabkan OUTER ditolak dan menyarankan penggunaan _match_kw("OUTER")
 
 
+## BUG 10: LEXER MENOLAK PARAMETER BERAWALAN ANGKA
+**Ditemukan oleh:** ALIA ARDANI dan SHAHNAZ SASKIA PUTRI · 
+**Diperbaiki oleh:** ALIA ARDANI
+
+**Gejala.**
+SPESIFIKASI.md bagian 2.6 menyebutkan bahwa parameter berbentuk ? atau :nama, dengan nama berisi huruf, angka, dan garis bawah. Pada pengerjaan ini, aturan tersebut ditafsirkan memperbolehkan angka sebagai karakter pertama karena tidak ada pembatasan khusus yang disebutkan.
+
+Namun, lexer lama menolak input :1 dan menghasilkan LexError. Berdasarkan interpretasi tersebut, hasil yang diharapkan adalah satu token PARAM bernilai :1, diikuti token EOF.
+
+**Reproduksi minimal.** 
+```
+SELECT :1 FROM t;
+```
+Bagian yang memicu masalah adalah parameter :1. Pengujian langsung menggunakan tokenize(":1") pada kode lama menghasilkan: Baris 1, kolom 1: parameter ':' harus diikuti nama
+Posisi tersebut berasal dari pengujian parameter secara terpisah, bukan dari SQL lengkap di atas.
+
+**Akar masalah.**
+Masalah terdapat pada fungsi _scan_token() dalam crud/lexer.py. Setelah membaca tanda :, kode lama memeriksa karakter berikutnya menggunakan:
+```
+if self._peek().isalpha() or self._peek() == "_":
+```
+Pemanggilan isalpha() hanya menerima huruf, sehingga angka 1 langsung ditolak. Sementara itu, perulangan pembacaan karakter berikutnya sudah menggunakan isalnum(), yang menerima huruf maupun angka. Akibatnya, angka diperbolehkan di tengah nama parameter, tetapi tidak pada awalnya.
+
+Hal ini berkaitan dengan konsep pengenalan token dalam Crafting Interpreters Bab 4. Pemeriksaan karakter pada lexer harus mengikuti aturan leksikal bahasa yang digunakan. 
+
+**Perbaikan.**
+Perubahan dilakukan pada cabang if ch == ":" dalam fungsi _scan_token() di crud/lexer.py, dengan mengganti isalpha() menjadi isalnum():
+```
+if ch == ":":
+    # Nama parameter berisi huruf, angka, atau garis bawah.
+    if self._peek().isalnum() or self._peek() == "_":
+        start = self.pos
+        while self._peek().isalnum() or self._peek() == "_":
+            self._advance()
+        self._add(
+            TokenType.PARAM,
+            ":" + self.src[start:self.pos],
+            line,
+            col,
+        )
+        return
+    raise LexError("parameter ':' harus diikuti nama", line, col)
+```
+Perubahan ini memungkinkan angka diterima pada awal nama parameter. Pemeriksaan tetap memastikan ada karakter nama setelah :, sehingga tanda : tanpa nama masih ditolak. Aturan identifier biasa dan API publik tidak diubah.
+
+Alternatif yang dipertimbangkan adalah menghapus pemeriksaan karakter pertama. Cara tersebut tidak dipilih karena dapat membuat : tanpa nama diterima sebagai token parameter. Penggunaan isalnum() mempertahankan validasi sekaligus menerima angka.
+
+**Test regresi.**
+TTest test_parameter_berawalan_angka ditambahkan dalam tests/test_tambahan.py. Test menggunakan tokenize(":1") dan memeriksa jenis token PARAM, nilai :1, posisi baris 1 kolom 1, serta keberadaan token EOF setelahnya.
+
+Perintah pengujian:
+```
+python -m pytest tests/test_tambahan.py::test_parameter_berawalan_angka -v
+```
+Sebelum perbaikan, test menghasilkan 1 failed in 0.66s karena lexer mengeluarkan LexError. Setelah perbaikan, test yang sama menghasilkan 1 passed in 0.09s tanpa mengubah isi test.
+
+**Peran AI.**
+AI membantu menemukan pembatasan karakter pertama parameter, memberikan gambaran dalam menyusun test regrasi, dan menyarankan penggantian isalpha() menjadi isalnum(). AI juga menjelaskan bahwa spesifikasi belum menetapkan aturan karakter pertama secara tegas.
+
 
 ## =============================================================================================================
 ## Bug 1: (judul singkat)
