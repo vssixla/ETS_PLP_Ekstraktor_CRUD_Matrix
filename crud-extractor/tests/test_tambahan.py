@@ -1,16 +1,9 @@
-"""Test tambahan buatan kelompok.
-
-Isi dengan:
-1. Satu test regresi untuk setiap bug yang kalian perbaiki (gagal sebelum perbaikan,
-   lulus sesudahnya). Beri nama yang menjelaskan bug-nya.
-2. Lima test kasus tepi, masing-masing dengan komentar singkat mengapa kasus itu berisiko.
-"""
-
 import pytest
 from crud.pipeline import analyze_source
 from crud.lexer import tokenize, LexError
 
-#tes_TODO (T1)
+#--------------- TEST TODO (T1, T2, T3) ----------------
+# Test TODO T1
 def test_insert_select_membentuk_ast_dan_crud():
     from crud import ast_nodes as ast
     from crud.parser import parse_sql
@@ -44,7 +37,7 @@ def test_insert_select_membentuk_ast_dan_crud():
         "pesanan": "R",
     }
 
-#TES TODO(T2)
+# Test TODO T2
 def test_t2_kolom_tanpa_qualifier():
     from crud.parser import parse_sql
     from crud.resolver import Resolver
@@ -81,7 +74,6 @@ def test_t2_kolom_tanpa_qualifier():
             assert expected_warning in diagnostics[0].message, sql
             assert diagnostics[0].line == 1, sql
 
-#TES TODO(T2) 2
 def test_t2_kolom_tanpa_qualifier_scope_kosong():
     from crud.parser import parse_sql
     from crud.resolver import Resolver, Scope, ScopeEntry
@@ -115,19 +107,18 @@ def test_t2_kolom_tanpa_qualifier_scope_kosong():
     assert "tanpa tabel" in diagnostic.message
     assert diagnostic.line == 1
 
-#tes_TODO (T3)
+#Test TODO T3
 def test_komentar_blok_berisi_bintang():
     toks = tokenize("a /* x ** y */ b")
     assert toks[0].value == "a"
     assert toks[1].value == "b"
 
-
 def test_komentar_blok_tidak_ditutup():
     with pytest.raises(LexError):
         tokenize("SELECT 1 /* belum ditutup")
 
-
-#test untuk Bug 1
+#------------------ Test bug yang ditemukan ------------------ 
+# Tets Bug 1: PARSER MEMBUANG STATEMENT VALID SETELAH KESALAHAN SINTAKS
 def test_recovery_memproses_statement_setelah_error():
     sql = (
         "SELECT id FROM pelanggan;\n"
@@ -162,13 +153,13 @@ def test_recovery_memproses_statement_setelah_error():
         "keranjang": "D",
     }
 
-#Bug 2
+# Test Bug 2: KEYWORD HURUF KECIL TIDAK DIKENALI SEBAGAI KEYWORD
 def test_keyword_huruf_campuran():
     toks = tokenize("Select x FrOm t")
     assert toks[0].value == "SELECT"
     assert toks[2].value == "FROM"
 
-#Bug 3
+# Test Bug 3: OPERATOR TIDAK SAMA DENGAN (<>) DIPECAH MENJADI DUA TOKEN
 def test_operator_tidak_sama_dipindai_sebagai_satu_token():
     from crud.lexer import TokenType, tokenize
 
@@ -184,29 +175,35 @@ def test_operator_tidak_sama_dipindai_sebagai_satu_token():
         (TokenType.EOF, ""),
     ]
 
-#Bug 4
+# Test Bug 4: KUTIP GANDA DI DALAM STRING MEMECAH SATU STRING MENJADI DUA TOKEN 
 def test_string_kutip_ganda_menjadi_satu_token():
     toks = tokenize("'O''Brien'")
     assert len(toks) == 2          # satu STRING + EOF
     assert toks[0].value == "O'Brien"
 
-#Bug 5
+# Test Bug 5: TABEL DI SUBQUERY PADA UPDATE SALAH DITANDAI U
 def test_subquery_di_update_hanya_dibaca():
     hasil = analyze_source(
         "UPDATE pelanggan SET aktif = 0 WHERE id IN (SELECT pelanggan_id FROM pesanan);"
     )
     assert hasil.matrix() == {"pelanggan": "U", "pesanan": "R"}
 
-#Bug 6
+# Test Bug 6: ALIAS DELETE BOCOR KE STATEMENT BERIKUTNYA
 def test_alias_delete_tidak_bocor_ke_statement_berikutnya():
     hasil = analyze_source(
         "DELETE FROM sesi s WHERE s.id = 1;\n"
         "SELECT s.id FROM pengguna u;"
     )
-    pesan = [d.message for d in hasil.diagnostics]
-    assert any("'s'" in m for m in pesan)
+    assert hasil.lex_error is None
+    assert hasil.parse_errors == []
+    assert [
+        (d.level, d.message, d.line)
+        for d in hasil.diagnostics
+    ] == [
+        ("error", "alias 's' tidak terdefinisi", 2),
+    ]
 
-#Bug 7 
+# Test Bug 7: ALIAS SCOPE LUAR MENGALAHKAN ALIAS SCOPE DALAM
 def test_alias_dalam_menutupi_alias_luar():
     from crud.parser import parse_sql
     from crud.resolver import Resolver
@@ -231,7 +228,7 @@ def test_alias_dalam_menutupi_alias_luar():
     assert kolom_luar.resolved == "pelanggan"
     assert kolom_dalam.resolved == "pesanan"
 
-# Bug 8
+# Test Bug 8: PARSER MENYAMAKAN PRESEDENSI AND DAN OR
 def test_and_lebih_kuat_daripada_or():
     from crud import ast_nodes as ast
     from crud.parser import parse_sql
@@ -259,17 +256,17 @@ def test_and_lebih_kuat_daripada_or():
     assert kondisi.right.right.op == "="
     assert kondisi.right.right.left.name == "c"
 
-#Bug 9
+# Test Bug 9: PARSER MENOLAK LEFT OUTER JOIN
 def test_left_outer_join_diterima():
     from crud.parser import parse_sql
 
     sql = "SELECT p.id FROM pelanggan p LEFT OUTER JOIN pesanan s ON p.id = s.id;"
     script = parse_sql(sql)
 
-    assert script.errors == []
-    assert len(script.statements) == 1
+    assert len(script.statements[0].joins) == 1
+    assert script.statements[0].joins[0].kind == "LEFT" 
 
-#Bug 10
+# Test Bug 10: LEXER MENOLAK PARAMETER BERAWALAN ANGKA
 def test_parameter_berawalan_angka():
     from crud.lexer import tokenize, TokenType
 
@@ -281,6 +278,29 @@ def test_parameter_berawalan_angka():
     assert tokens[0].line == 1
     assert tokens[0].col == 1
     assert tokens[1].type == TokenType.EOF
+
+# Test Bug 11: DIAGNOSTIK RESOLVER TERBAWA KE SCRIPT BERIKUTNYA
+def test_resolver_diagnostik_tidak_terbawa_ke_script_berikutnya():
+    from crud.parser import parse_sql
+    from crud.resolver import Resolver
+
+    script_salah = parse_sql("SELECT q.id FROM pelanggan p;")
+    script_valid = parse_sql("SELECT p.id FROM pelanggan p;")
+
+    assert script_salah.errors == []
+    assert script_valid.errors == []
+
+    resolver = Resolver()
+
+    diagnostics_pertama = resolver.resolve_script(script_salah)
+    assert len(diagnostics_pertama) == 1
+    assert diagnostics_pertama[0].level == "error"
+    assert diagnostics_pertama[0].message == "alias 'q' tidak terdefinisi"
+    assert resolver.scope is None
+
+    diagnostics_kedua = resolver.resolve_script(script_valid)
+    assert diagnostics_kedua == []
+    assert resolver.scope is None
 
 #LIMA TEST KASUS TEPI
 def test_tepi_input_kosong_menghasilkan_eof():
@@ -326,26 +346,3 @@ def test_tepi_parameter_titik_dua_tanpa_nama():
     # Risiko: pelonggaran karakter awal parameter membuat ':' kosong diterima.
     with pytest.raises(LexError):
         tokenize(":")
-
-#Bug 
-def test_resolver_diagnostik_tidak_terbawa_ke_script_berikutnya():
-    from crud.parser import parse_sql
-    from crud.resolver import Resolver
-
-    script_salah = parse_sql("SELECT q.id FROM pelanggan p;")
-    script_valid = parse_sql("SELECT p.id FROM pelanggan p;")
-
-    assert script_salah.errors == []
-    assert script_valid.errors == []
-
-    resolver = Resolver()
-
-    diagnostics_pertama = resolver.resolve_script(script_salah)
-    assert len(diagnostics_pertama) == 1
-    assert diagnostics_pertama[0].level == "error"
-    assert diagnostics_pertama[0].message == "alias 'q' tidak terdefinisi"
-    assert resolver.scope is None
-
-    diagnostics_kedua = resolver.resolve_script(script_valid)
-    assert diagnostics_kedua == []
-    assert resolver.scope is None
