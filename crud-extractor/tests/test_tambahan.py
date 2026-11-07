@@ -281,3 +281,29 @@ def test_parameter_berawalan_angka():
     assert tokens[0].line == 1
     assert tokens[0].col == 1
     assert tokens[1].type == TokenType.EOF
+
+#LIMA TEST KASUS TEPI
+def test_tepi_input_kosong_menghasilkan_eof():
+    from crud.lexer import TokenType
+
+    # Risiko: lexer mengakses karakter di luar input saat sumber kosong.
+    token = tokenize("")
+
+    assert len(token) == 1
+    assert tokens[0].type == TokenType.EOF
+
+def test_tepi_input_hanya_whitespace():
+    from crud.lexer import TokenType
+
+    # Risiko: spasi, tab, dan baris baru menghasilkan token yang tidak diperlukan.
+    tokens = tokenize(" \t\r\n ")
+
+    assert len(tokens) == 1
+    assert tokens[0].type == TokenType.EOF
+
+
+def test_tepi_komentar_baris_di_akhir_file():
+    from crud.lexer import TokenType
+
+    # Risiko: pemindaian komentar menunggu newline meskipun input sudah habis.
+    tokens = tokenize("-- komentar tanpa baris baru")
