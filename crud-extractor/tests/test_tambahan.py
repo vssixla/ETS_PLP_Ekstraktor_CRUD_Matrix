@@ -287,9 +287,9 @@ def test_tepi_input_kosong_menghasilkan_eof():
     from crud.lexer import TokenType
 
     # Risiko: lexer mengakses karakter di luar input saat sumber kosong.
-    token = tokenize("")
+    tokens = tokenize("")
 
-    assert len(token) == 1
+    assert len(tokens) == 1
     assert tokens[0].type == TokenType.EOF
 
 def test_tepi_input_hanya_whitespace():
