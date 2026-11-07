@@ -1,5 +1,5 @@
-file,pelanggan,pembayaran,pengguna,pesanan,sesi
-audit.sql,RU,R,R,RU,D
-campuran_error.sql,R,,,,
-laporan_penjualan.sql,,,,,
-pemeliharaan.sql,,,,,
+file,arsip_pesanan,crm.alamat,crm.log_perubahan,crm.pelanggan,keranjang,pelanggan,pembayaran,pengguna,pesanan,produk,sesi
+audit.sql,,,,,,R,R,R,RU,,D
+campuran_error.sql,,,,,D,R,,,,U,
+laporan_penjualan.sql,C,,,,,RU,,,RD,,
+pemeliharaan.sql,,RD,C,RU,,,,,,,

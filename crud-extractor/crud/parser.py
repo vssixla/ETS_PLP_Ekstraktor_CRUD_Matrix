@@ -215,7 +215,6 @@ class Parser:
                 rows.append(self._value_row())
             return ast.Insert(table, columns, rows, None, line=start.line)
         if self._check_kw("SELECT"):
-        #TODO(T1)
             query = self._select()
             return ast.Insert(
                 table=table,

@@ -330,7 +330,7 @@ Walaupun gejala akhirnya berupa parse error, akar masalahnya berada pada lexer. 
 Perubahan dilakukan pada cabang if ch == "<": di fungsi _scan_token() dalam crud/lexer.py. Cabang tersebut diperluas agar menangani tiga kemungkinan operator: <=, <>, dan <.
 ```
 if ch == "<":
-    f self._match("="):
+    if self._match("="):
         op = "<="
     elif self._match(">"):
         op = "<>"
