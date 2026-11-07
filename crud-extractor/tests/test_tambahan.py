@@ -302,12 +302,6 @@ def test_tepi_input_hanya_whitespace():
     assert tokens[0].type == TokenType.EOF
 
 
-def test_tepi_komentar_baris_di_akhir_file():
-    from crud.lexer import TokenType
-
-    # Risiko: pemindaian komentar menunggu newline meskipun input sudah habis.
-    tokens = tokenize("-- komentar tanpa baris baru")
-
 def test_tepi_komentar_tanpa_newline_di_akhir_input():
     from crud.lexer import TokenType
 
