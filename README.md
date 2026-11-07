@@ -86,16 +86,6 @@ Proses analisis SQL dilakukan melalui beberapa tahap:
    python -m pytest
    ```
 
-5. Jalankan ekstraktor CRUD Matrix:
-   ```bash
-   python -m crud.cli data/sample/*.sql --detail detail.csv --kolom kolom.csv
-   ```
-
-6. Lihat AST hasil parsing dan resolusi:
-   ```bash
-   python -m crud.cli data/sample/audit.sql --ast
-   ```
-
 7. Jalankan evaluasi:
    ```bash
    python evaluate.py
