@@ -308,7 +308,6 @@ def test_tepi_komentar_baris_di_akhir_file():
     # Risiko: pemindaian komentar menunggu newline meskipun input sudah habis.
     tokens = tokenize("-- komentar tanpa baris baru")
 
-
 def test_tepi_komentar_tanpa_newline_di_akhir_input():
     from crud.lexer import TokenType
 
@@ -317,3 +316,14 @@ def test_tepi_komentar_tanpa_newline_di_akhir_input():
 
     assert len(tokens) == 1
     assert tokens[0].type == TokenType.EOF
+
+def test_tepi_penanda_komentar_di_dalam_string():
+    from crud.lexer import TokenType
+
+    # Risiko: penanda komentar dalam string dianggap sebagai komentar SQL.
+    tokens = tokenize("'-- bukan komentar /* tetap string */'")
+
+    assert len(tokens) == 2
+    assert tokens[0].type == TokenType.STRING
+    assert tokens[0].value == "-- bukan komentar /* tetap string */"
+    assert tokens[1].type == TokenType.EOF
