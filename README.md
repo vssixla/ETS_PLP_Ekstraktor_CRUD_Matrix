@@ -8,5 +8,5 @@ Proyek ini merupakan tugas Evaluasi Tengah Semester (ETS) mata kuliah *Programmi
 
 | NIM | NAMA | USERNAME GITHUB |
 |---|---|---|
-| 251524035 | Alia Ardani | [@nanaszs](https://github.com/nanaszs) |
-| 251524062 | Shahnaz Saskia Putri | [@vssixla](https://github.com/vssixla) |
+| 251524035 | Alia Ardani |[@vssixla](https://github.com/vssixla) |
+| 251524062 | Shahnaz Saskia Putri | [@nanaszs](https://github.com/nanaszs) |
