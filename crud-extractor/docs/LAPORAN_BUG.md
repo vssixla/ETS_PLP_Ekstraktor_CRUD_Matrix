@@ -1,14 +1,14 @@
-# Laporan Bug
-
----
-
+# LAPORAN BUG
 ## TODO T1: Melengkapi Dukungan INSERT ... SELECT
-**Ditemukan oleh:** ALIA ARDANI dan SHAHNAZ SASKIA PUTRI, berdasarkan penanda TODO(T1) pada kode awal · 
+**Ditemukan oleh:** ALIA ARDANI dan SHAHNAZ SASKIA PUTRI, berdasarkan penanda TODO(T1) pada kode awal 
+
 **Diperbaiki oleh:** ALIA ARDANI
 
 **Gejala.** 
 Program belum dapat memproses perintah INSERT yang mengambil data dari hasil query SELECT. Ketika menerima bentuk tersebut, parser menghasilkan pesan:
+```
 INSERT ... SELECT belum didukung, ditemukan 'SELECT'
+```
 
 Padahal, grammar pada SPESIFIKASI.md bagian 3 mengizinkan sumber data INSERT berupa VALUES maupun query SELECT. Berdasarkan aturan CRUD pada bagian 5, tabel tujuan INSERT mendapatkan operasi C, sedangkan tabel yang dibaca oleh SELECT mendapatkan operasi R. 
 
@@ -38,6 +38,7 @@ Keterkaitannya dengan Bab 5 adalah representasi sintaks dalam AST. Statement INS
 
 **Perbaikan.**
 Perubahan dilakukan pada fungsi _insert() dalam crud/parser.py. Cabang yang sebelumnya menolak SELECT diganti dengan pemanggilan _select(), kemudian hasilnya disimpan dalam node ast.Insert:
+```
 if self._check_kw("SELECT"):
     query = self._select()
     return ast.Insert(
@@ -48,6 +49,7 @@ if self._check_kw("SELECT"):
         line=start.line,
     )
 raise ParseError("diharapkan VALUES atau SELECT", self._peek())
+```
 
 Perubahan ini memungkinkan INSERT menggunakan query SELECT sebagai sumber data. 
 Fungsi _select() digunakan kembali untuk membaca query dan membentuk AST, sedangkan table dan columns mempertahankan informasi tabel tujuan serta kolom yang akan diisi. Atribut values=[] menunjukkan bahwa data tidak berasal dari klausa VALUES, sementara query=query menyimpan hasil parsing SELECT. Keyword SELECT tidak dikonsumsi terlebih dahulu karena pembacaannya sudah ditangani oleh _select(). 
@@ -59,7 +61,9 @@ Test tambahan dibuat dalam tests/test_tambahan.py dengan nama:
 test_insert_select_membentuk_ast_dan_crud
 
 Input yang digunakan:
+```
 INSERT INTO arsip (id) SELECT id FROM pesanan;
+```
 
 Test memeriksa bahwa:
     1. Parsing selesai tanpa parse error dan menghasilkan satu statement.
@@ -70,18 +74,21 @@ Test memeriksa bahwa:
     6. Analisis menghasilkan operasi C untuk arsip dan R untuk pesanan.
 
 Pengujian dilakukan bersama test bawaan:
+```
 python -m pytest tests/test_parser.py::test_insert_select tests/test_parser.py::test_insert_values tests/test_tambahan.py::test_insert_select_membentuk_ast_dan_crud -v
+```
 
 Hasil: 
 3 passed in 0.18s
 Sebelum perbaikan, test bawaan test_insert_select telah terbukti gagal dengan pesan bahwa INSERT SELECT belum didukung. Setelah perbaikan, test bawaan tersebut lulus.
 
 **Peran AI.**
-AI membantu menjelaskan tujuan TODO(T1), menyarankan pemanggilan _select() dari _insert(), memberikan contoh pembentukan node AST INSERT. AI juga membantu memperbaiki kesalahan saat penyusunan kode, terutama kesalahan ppercabangan if pada "if self._check_kw("SELECT"):" dan membantu validasi kode program untuk test TODO T1 dengan memberikan rekomendasi tambahan kode program untuk test ini.
+AI membantu menjelaskan tujuan TODO(T1), menyarankan pemanggilan _select() dari _insert(), memberikan contoh pembentukan node AST INSERT. AI juga membantu memperbaiki kesalahan saat penyusunan kode, terutama kesalahan percabangan if pada "if self._check_kw("SELECT"):" dan membantu validasi kode program untuk test TODO T1 dengan memberikan rekomendasi tambahan kode program untuk test ini.
 
 
 ## TODO T2: MELENGKAPI RESOLUSI KOLOM TANPA QUALIFIER
 **Ditemukan oleh:** ALIA ARDANI dan SHAHNAZ SASKIA PUTRI, berdasarkan penanda TODO(T2) pada kode awal · 
+
 **Diperbaiki oleh:** ALIA ARDANI
 
 **Gejala.** 
@@ -92,7 +99,9 @@ Pada kode awal, atribut resolved kedua kolom tetap bernilai None. Kondisi ini te
 Berdasarkan SPESIFIKASI.md bagian 4.3, kolom tanpa qualifier harus diperiksa menggunakan sumber yang terdapat pada scope terdalam. Apabila terdapat tepat satu sumber, kolom diarahkan ke sumber tersebut. Apabila terdapat lebih dari satu sumber, resolver memberikan warning "ambigu tanpa skema". Apabila tidak terdapat sumber, resolver memberikan warning dan membiarkan kolom tidak teresolusi.
 
 **Reproduksi minimal.**
+```
 SELECT nama FROM pelanggan;
+```
 Pada kode awal, query tersebut dapat diparsing, tetapi kolom nama tetap memiliki resolved = None setelah melewati resolver. Hasil yang diharapkan adalah resolved = "pelanggan" tanpa diagnostic, karena scope query hanya memiliki satu sumber tabel.
 
 Masalah ini menyangkut informasi keterkaitan kolom dengan sumber tabelnya. Oleh karena itu, pemeriksaan dilakukan langsung terhadap hasil resolusi pada AST. CRUD matrix saja belum cukup untuk membuktikan bahwa fitur ini bekerja, karena tabel pelanggan masih dapat tercatat sebagai sumber pembacaan meskipun kolomnya belum teresolusi.
@@ -124,7 +133,9 @@ Pada penyusunan awal test tambahan, kondisi tanpa sumber diuji menggunakan SELEC
 Pengujian scope kosong dipisahkan menjadi unit test resolver. Test memperoleh node kolom dari query valid, kemudian membuat scope luar yang memiliki sumber pelanggan dan scope terdalam yang kosong. Fungsi _column() dipanggil langsung untuk memastikan kolom tetap memiliki resolved = None serta menghasilkan warning. Susunan ini juga memeriksa bahwa resolver tidak mengambil tabel dari scope luar ketika scope terdalam kosong.
 
 Kedua test tambahan dijalankan bersama seluruh test bawaan dalam tests/test_resolver.py menggunakan perintah berikut:
+```
 python -m pytest tests/test_resolver.py tests/test_tambahan.py::test_t2_kolom_tanpa_qualifier tests/test_tambahan.py::test_t2_kolom_tanpa_qualifier_scope_kosong -v
+```
 
 Hasil pengujian menunjukkan 6 passed in 0.23s. Bukti kegagalan sebelum perbaikan tersedia dari test bawaan test_kolom_tanpa_qualifier_satu_tabel, yang sebelumnya memperoleh {None}. Setelah perbaikan, test tersebut dan kedua test tambahan lulus. Hasil ini membuktikan perilaku pada kasus yang diuji, tetapi belum membuktikan bahwa seluruh aturan resolver telah terpenuhi.
 
@@ -134,11 +145,18 @@ AI membantu saya memperbaiki kesalahan kode program fungsi _column() pada bagian
 
 ## TODO T3: DUKUNGAN KOMENTAR BLOK
 **Ditemukan oleh:** SHAHNAZ SASKIA PUTRI dan ALIA ARDANI, berdasarkan penanda TODO(T3) pada kode awal · 
+
 **Diperbaiki oleh:** SHAHNAZ SASKIA PUTRI
 
 **Gejala.** 
 Berdasarkan SPESIFIKASI.md bagian 2.3, komentar blok /* ... */ dapat terdiri dari beberapa baris, boleh mengandung karakter *, tidak boleh bersarang, tidak menghasilkan token, dan harus menghasilkan LexError jika tidak ditutup.
 Namun, pada kode awal, lexer langsung menghasilkan LexError: komentar blok belum didukung ketika menemukan /*. Akibatnya, test bawaan test_komentar_blok gagal dan file pemeliharaan.sql yang diawali komentar blok tidak dapat dianalisis karena terjadi LEX ERROR: Baris 1, kolom 1.
+
+**Reproduksi minimal.**
+```
+SELECT id FROM pelanggan;
+```
+Pada kode awal, lexer menghasilkan LexError karena komentar blok belum didukung. Hasil yang diharapkan adalah komentar dilewati dan statement SELECT dapat diproses
 
 **Akar masalah.**
 Lexer belum memiliki implementasi untuk membaca komentar blok. Ketika menemukan /*, proses pemindaian langsung dihentikan dengan LexError tanpa memeriksa isi maupun penutup komentar.
@@ -158,7 +176,8 @@ AI membantu memberikan arahan mengenai proses pemindaian komentar blok serta men
 
 
 ## BUG 1: PARSER MEMBUANG STATEMENT VALID SETELAH KESALAHAN SINTAKS
-**Ditemukan oleh:** ALIA ARDANI dan SHAHNAZ SASKIA PUTRI · 
+**Ditemukan oleh:** ALIA ARDANI dan SHAHNAZ SASKIA PUTRI ·
+
 **Diperbaiki oleh:** ALIA ARDANI
 
 **Gejala.** 
@@ -180,24 +199,26 @@ Masalah ini berkaitan dengan konsep panic-mode error recovery dalam Crafting Int
 
 **Perbaikan.**
 Perubahan dilakukan pada fungsi _synchronize() dalam crud/parser.py. Setiap token yang dilewati diperiksa jenisnya. Jika token tersebut adalah T.SEMICOLON, fungsi langsung selesai sehingga parsing dapat dilanjutkan dari token setelah titik koma.
-
+```
 def _synchronize(self) -> None:
     # Panic-mode recovery: lewati statement rusak sampai termasuk ';'.
     while not self._at_end():
         token = self._advance()
         if token.type == T.SEMICOLON:
             return
+```
 
 Alternatif yang dipertimbangkan adalah menghentikan recovery ketika menemukan keyword awal statement, seperti SELECT. Alternatif ini tidak dipilih karena SELECT juga dapat muncul dalam subquery pada statement yang sedang dibuang. Selain itu, spesifikasi secara tegas menetapkan titik koma sebagai batas recovery.
 
 **Test regresi.**
-Test ditambahkan pada tests/test_tambahan.py dengan nama:
-test_recovery_memproses_statement_setelah_error
+Test ditambahkan pada tests/test_tambahan.py dengan nama: test_recovery_memproses_statement_setelah_error
 
 Test menggunakan satu SELECT valid, satu SELECT rusak, kemudian UPDATE dan DELETE valid. Pemeriksaan mencakup tidak adanya lexical error, tepat satu parse error pada baris yang benar, kelanjutan pemrosesan ketiga statement valid, serta kesesuaian CRUD matrix.
 
 Perintah pengujian:
+```
 python -m pytest tests/test_tambahan.py::test_recovery_memproses_statement_setelah_error -v
+```
 Sebelum perbaikan, test FAILED karena hasil hanya memuat statement SELECT pertama. Setelah perbaikan, test yang sama PASSED tanpa mengubah isi test.
 
 **Peran AI.**
@@ -205,7 +226,8 @@ AI membantu saya untuk memvalidasi kalau temuan bug dan perbaikan yang akan temu
 
 
 ## BUG 2: KEYWORD HURUF KECIL TIDAK DIKENALI SEBAGAI KEYWORD
-**Ditemukan oleh:** SHAHNAZ SASKIA PUTRI dan ALIA ARDANI · 
+**Ditemukan oleh:** SHAHNAZ SASKIA PUTRI dan ALIA ARDANI ·
+
 **Diperbaiki oleh:** SHAHNAZ SASKIA PUTRI
 
 **Gejala.**
@@ -237,7 +259,8 @@ Proses debugging dilakukan dengan bantuan AI yang memberikan arahan dalam menemu
 
 
 ## BUG 3: OPERATOR TIDAK SAMA DENGAN (<>) DIPECAH MENJADI DUA TOKEN
-**Ditemukan oleh:** ALIA ARDANI dan SHAHNAZ SASKIA PUTRI · 
+**Ditemukan oleh:** ALIA ARDANI dan SHAHNAZ SASKIA PUTRI ·
+
 **Diperbaiki oleh:** ALIA ARDANI
 
 **Gejala.** 
@@ -255,7 +278,9 @@ Akibat bug ini, statement SELECT yang sebenarnya valid gagal di-parse dan tidak 
 
 **Reproduksi minimal.** SQL
 SQL sederhana yang memicu bug:
+```
 SELECT id FROM t WHERE id <> 10;
+```
 
 Untuk mengisolasi masalah pada lexer, pengujian dapat menggunakan potongan ekspresi:
 tokenize("a <> 10")
@@ -273,10 +298,18 @@ Potongan ekspresi ini digunakan agar kesalahan pembentukan token dapat diamati l
 
 **Akar masalah.**
 Kesalahan berada pada fungsi _scan_token() dalam crud/lexer.py, khususnya pada cabang yang menangani karakter <. Kode awalnya adalah:
+```
 if ch == "<":
-    op = "<=" if self._match("=") else "<"
+    if self._match("="):
+        op = "<="
+    elif self._match(">"):
+        op = "<>"
+    else:
+        op = "<"
+
     self._add(TokenType.OP, op, line, col)
     return
+```
 
 Kode tersebut hanya mempertimbangkan dua kemungkinan: operator <= apabila karakter berikutnya adalah =, atau operator < apabila karakter berikutnya bukan =. Tidak ada pemeriksaan untuk kemungkinan operator <>.
 
@@ -295,7 +328,7 @@ Walaupun gejala akhirnya berupa parse error, akar masalahnya berada pada lexer. 
 
 **Perbaikan.**
 Perubahan dilakukan pada cabang if ch == "<": di fungsi _scan_token() dalam crud/lexer.py. Cabang tersebut diperluas agar menangani tiga kemungkinan operator: <=, <>, dan <.
-
+```
 if ch == "<":
     f self._match("="):
         op = "<="
@@ -306,12 +339,12 @@ if ch == "<":
 
     self._add(TokenType.OP, op, line, col)
      return
+```
 
 Perbaikan dilakukan pada bagian if ch == "<" dengan menambahkan pemeriksaan self._match(">") untuk mengenali operator <>. Fungsi _match() memeriksa sekaligus mengonsumsi karakter berikutnya apabila sesuai, sehingga < dan > dikenali sebagai satu token OP, bukan dua token terpisah. Sementara itu, percabangan if, elif, dan else tetap mempertahankan dukungan operator <= dan <. Pemanggilan _add() digunakan untuk menyimpan operator yang dikenali sebagai satu token, sedangkan return mengakhiri pemindaian token tersebut. Perubahan dilakukan pada lexer karena pengenalan operator merupakan tanggung jawab lexer.
 
 **Test regresi.**
-Test ditambahkan pada tests/test_tambahan.py dengan nama:
-test_operator_tidak_sama_dipindai_sebagai_satu_token
+Test ditambahkan pada tests/test_tambahan.py dengan nama: test_operator_tidak_sama_dipindai_sebagai_satu_token
 Test memeriksa jenis, nilai, urutan, dan jumlah token. Pemeriksaan seluruh daftar token diperlukan untuk memastikan bahwa <> benar-benar menjadi satu token dan tidak meninggalkan token > tambahan.
 
 Sebelum perbaikan, test menghasilkan FAILED dengan perbedaan utama:
@@ -321,7 +354,9 @@ Setelah perbaikan lengkap diterapkan, test yang sama menghasilkan PASSED tanpa m
 Test bawaan test_operator_multi_karakter juga dijalankan untuk memeriksa bahwa operator <=, >=, dan != tetap dikenali dengan benar.
 
 Perintah pengujian:
+```
 python -m pytest tests/test_tambahan.py::test_operator_tidak_sama_dipindai_sebagai_satu_token tests/test_lexer.py::test_operator_multi_karakter -v
+```
 
 Hasil pengujian terakhir:
 2 passed in 0.13s
@@ -334,7 +369,8 @@ AI membantu menghubungkan pesan parse error pada laporan_penjualan.sql dengan ke
 
 
 ## BUG 4: KUTIP GANDA DI DALAM STRING MEMECAH SATU STRING MENJADI DUA TOKEN 
-**Ditemukan oleh:** SHAHNAZ SASKIA PUTRI dan ALIA ARDANI · 
+**Ditemukan oleh:** SHAHNAZ SASKIA PUTRI dan ALIA ARDANI ·
+
 **Diperbaiki oleh:** SHAHNAZ SASKIA PUTRI
 
 **Gejala.**
@@ -364,7 +400,8 @@ AI membantu memberikan arahan dalam memperbaiki fungsi _string serta menyarankan
 
 
 ## BUG 5: TABEL DI SUBQUERY PADA UPDATE SALAH DITANDAI U
-**Ditemukan oleh:** SHAHNAZ SASKIA PUTRI dan ALIA ARDANI · 
+**Ditemukan oleh:** SHAHNAZ SASKIA PUTRI dan ALIA ARDANI ·
+
 **Diperbaiki oleh:** SHAHNAZ SASKIA PUTRI dan ALIA ARDANI
 
 **Gejala.**
@@ -387,14 +424,15 @@ Perubahan dilakukan pada `crud/analyzer.py`, di cabang UPDATE pada `analyze_stat
 Alternatif yang dipertimbangkan adalah membiarkan penelusuran seperti semula, lalu membuang status U dari semua tabel selain target setelah analisis selesai. Alternatif ini tidak dipilih karena hanya menambal hasil, sedangkan penyebabnya adalah operasi yang salah diteruskan saat penelusuran.
 
 **Test regresi.**
-Test `test_subquery_di_update_hanya_dibaca` ditambahkan di `tests/test_tambahan.py`. Sebelum perbaikan test ini gagal karena `pesanan` bernilai `U`, dan sesudah perbaikan lulus. Test bawaan `test_matrix_laporan_penjualan` yang sebelumnya gagal juga ikut lulus. 
+Test test_subquery_di_update_hanya_dibaca ditambahkan di tests/test_tambahan.py. Sebelum perbaikan test ini gagal karena `pesanan` bernilai `U`, dan sesudah perbaikan lulus. Test bawaan `test_matrix_laporan_penjualan` yang sebelumnya gagal juga ikut lulus. 
 
 **Peran AI.**
 AI menunjukkan lokasi kode yang perlu diperiksa dan mengusulkan perubahan `"U"` menjadi `"R"` serta contoh isi test. Saya menulis test, menjalankannya sampai terlihat gagal, mengubah dua baris di `analyzer.py`, lalu memverifikasi bahwa test tersebut lulus dan seluruh suite tidak memiliki test baru yang rusak.
 
 
 ## BUG 6: ALIAS DELETE BOCOR KE STATEMENT BERIKUTNYA
-**Ditemukan oleh:** SHAHNAZ SASKIA PUTRI dan ALIA ARDANI · 
+**Ditemukan oleh:** SHAHNAZ SASKIA PUTRI dan ALIA ARDANI ·
+
 **Diperbaiki oleh:** SHAHNAZ SASKIA PUTRI
 
 **Gejala.**
@@ -460,7 +498,8 @@ AI turut membantu menjelaskan kesalahan lokasi folder ketika pytest belum menemu
 
 
 ## BUG 7: ALIAS SCOPE LUAR MENGALAHKAN ALIAS SCOPE DALAM
-**Ditemukan oleh:** ALIA ARDANI dan SHAHNAZ SASKIA PUTRI · 
+**Ditemukan oleh:** ALIA ARDANI dan SHAHNAZ SASKIA PUTRI ·
+
 **Diperbaiki oleh:** ALIA ARDANI
 
 **Gejala.**
@@ -522,7 +561,8 @@ AI membantu memvlidasi kesalahan penggunaan reversed(chain) pada fungsi _lookup(
 
 
 ## BUG 8: PARSER MENYAMAKAN PRESEDENSI AND DAN OR
-**Ditemukan oleh:** ALIA ARDANI dan SHAHNAZ SASKIA PUTRI · 
+**Ditemukan oleh:** ALIA ARDANI dan SHAHNAZ SASKIA PUTRI ·
+
 **Diperbaiki oleh:** ALIA ARDANI
 
 **Gejala.**
@@ -582,7 +622,8 @@ AI membantu dalam menemukan penyebab keselahan logika pada fungsi sebelumnya, me
 
 
 ## BUG 9: PARSER MENOLAK LEFT OUTER JOIN
-**Ditemukan oleh:** ALIA ARDANI dan SHAHNAZ SASKIA PUTRI · 
+**Ditemukan oleh:** ALIA ARDANI dan SHAHNAZ SASKIA PUTRI ·
+
 **Diperbaiki oleh:** ALIA ARDANI
 
 **Gejala.**
@@ -650,7 +691,8 @@ AAI membantu saya dalam menemukan bug ini, membantu memperbaiki kode program unt
 
 
 ## BUG 10: LEXER MENOLAK PARAMETER BERAWALAN ANGKA
-**Ditemukan oleh:** ALIA ARDANI dan SHAHNAZ SASKIA PUTRI · 
+**Ditemukan oleh:** ALIA ARDANI dan SHAHNAZ SASKIA PUTRI ·
+
 **Diperbaiki oleh:** ALIA ARDANI
 
 **Gejala.**
@@ -697,7 +739,7 @@ Perubahan ini memungkinkan angka diterima pada awal nama parameter. Pemeriksaan 
 Alternatif yang dipertimbangkan adalah menghapus pemeriksaan karakter pertama. Cara tersebut tidak dipilih karena dapat membuat : tanpa nama diterima sebagai token parameter. Penggunaan isalnum() mempertahankan validasi sekaligus menerima angka.
 
 **Test regresi.**
-TTest test_parameter_berawalan_angka ditambahkan dalam tests/test_tambahan.py. Test menggunakan tokenize(":1") dan memeriksa jenis token PARAM, nilai :1, posisi baris 1 kolom 1, serta keberadaan token EOF setelahnya.
+Test test_parameter_berawalan_angka ditambahkan dalam tests/test_tambahan.py. Test menggunakan tokenize(":1") dan memeriksa jenis token PARAM, nilai :1, posisi baris 1 kolom 1, serta keberadaan token EOF setelahnya.
 
 Perintah pengujian:
 ```
@@ -706,11 +748,12 @@ python -m pytest tests/test_tambahan.py::test_parameter_berawalan_angka -v
 Sebelum perbaikan, test menghasilkan 1 failed in 0.66s karena lexer mengeluarkan LexError. Setelah perbaikan, test yang sama menghasilkan 1 passed in 0.09s tanpa mengubah isi test.
 
 **Peran AI.**
-AI membantu menemukan pembatasan karakter pertama parameter, memberikan gambaran dalam menyusun test regrasi, dan menyarankan penggantian isalpha() menjadi isalnum(). AI juga menjelaskan bahwa spesifikasi belum menetapkan aturan karakter pertama secara tegas.
+AI membantu menemukan pembatasan karakter pertama parameter, memberikan gambaran dalam menyusun test regresi, dan menyarankan penggantian isalpha() menjadi isalnum(). AI juga menjelaskan bahwa spesifikasi belum menetapkan aturan karakter pertama secara tegas.
 
 
 ## BUG 11: DIAGNOSTIK RESOLVER TERBAWA KE SCRIPT BERIKUTNYA
-**Ditemukan oleh:** ALIA ARDANI dan SHAHNAZ SASKIA PUTRI · 
+**Ditemukan oleh:** ALIA ARDANI dan SHAHNAZ SASKIA PUTRI ·
+
 **Diperbaiki oleh:** ALIA ARDANI dan SHAHNAZ SASKIA PUTRI
 
 **Gejala.**
