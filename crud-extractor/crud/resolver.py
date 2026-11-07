@@ -42,6 +42,8 @@ class Resolver:
         self.diagnostics: list[Diagnostic] = []
 
     def resolve_script(self, script: ast.Script) -> list[Diagnostic]:
+        # Setiap pemanggilan mengumpulkan diagnostik untuk script yang diproses.
+        self.diagnostics = []
         for stmt in script.statements:
             self.resolve_statement(stmt)
         return self.diagnostics
@@ -170,7 +172,7 @@ class Resolver:
             for arg in expr.args:
                 self._expr(arg)
 
-    #TODO(T2)
+    # Resolusi kolom berdasarkan qualifier dan jumlah sumber pada scope terdalam.(TODO 2)
     def _column(self, col: ast.ColumnRef) -> None:
         if col.qualifier is not None:
             entry = self._lookup(col.qualifier)

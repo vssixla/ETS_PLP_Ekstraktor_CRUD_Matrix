@@ -712,6 +712,61 @@ Sebelum perbaikan, test menghasilkan 1 failed in 0.66s karena lexer mengeluarkan
 AI membantu menemukan pembatasan karakter pertama parameter, memberikan gambaran dalam menyusun test regrasi, dan menyarankan penggantian isalpha() menjadi isalnum(). AI juga menjelaskan bahwa spesifikasi belum menetapkan aturan karakter pertama secara tegas.
 
 
+## BUG 11: DIAGNOSTIK RESOLVER TERBAWA KE SCRIPT BERIKUTNYA
+**Ditemukan oleh:** ALIA ARDANI dan SHAHNAZ SASKIA PUTRI · 
+**Diperbaiki oleh:** ALIA ARDANI
+
+**Gejala.**
+Ketika satu objek Resolver digunakan untuk memproses dua script secara berurutan, diagnostik dari script pertama ikut muncul pada hasil script kedua. Akibatnya, script kedua yang valid tetap dilaporkan memiliki error.
+
+SPESIFIKASI.md bagian 7 menetapkan API resolve_script(script) yang mengembalikan diagnostik. Dalam perbaikan ini, hasil tersebut ditafsirkan hanya memuat diagnostik script yang sedang diproses. Penggunaan ulang instance belum diatur secara eksplisit, sehingga temuan ini dicatat sebagai perbaikan untuk skenario tersebut.
+
+**Reproduksi minimal.** 
+Jalankan kedua SQL berikut sebagai dua script terpisah menggunakan objek resolver yang sama:
+```
+SELECT q.id FROM pelanggan p;
+SELECT p.id FROM pelanggan p;
+```
+
+Cara reproduksi:
+```
+resolver = Resolver()
+resolver.resolve_script(parse_sql("SELECT q.id FROM pelanggan p;"))
+hasil = resolver.resolve_script(parse_sql("SELECT p.id FROM pelanggan p;"))
+```
+Hasil kedua masih memuat error alias 'q' tidak terdefinisi, padahal hasil yang diharapkan adalah list kosong.
+
+**Akar masalah.**
+Masalah terdapat pada fungsi resolve_script() dalam crud/resolver.py. List self.diagnostics hanya dibuat saat objek diinisialisasi dan tidak direset sebelum memproses script berikutnya.
+
+Hal ini berkaitan dengan pengelolaan state pada pass resolusi dalam Crafting Interpreters Bab 11. Pada kasus ini, hasil diagnostik pemrosesan sebelumnya masih tersimpan dalam objek. Scope sudah kembali None, sehingga penyebabnya bukan kebocoran scope.
+
+**Perbaikan.**
+Tambahkan pembuatan list diagnostik baru pada awal fungsi resolve_script():
+```
+def resolve_script(self, script: ast.Script) -> list[Diagnostic]:
+    # Diagnostik hanya untuk script yang sedang diproses.
+    self.diagnostics = []
+
+    for stmt in script.statements:
+        self.resolve_statement(stmt)
+
+    return self.diagnostics
+```
+Alternatif self.diagnostics.clear() tidak dipilih karena mengosongkan list yang sama, sehingga hasil pemanggilan sebelumnya yang masih disimpan oleh pemanggil ikut berubah. Penggunaan list baru mempertahankan hasil sebelumnya.
+
+**Test regresi.**
+Test test_resolver_diagnostik_tidak_terbawa_ke_script_berikutnya ditambahkan dalam tests/test_tambahan.py. Test memeriksa bahwa script pertama menghasilkan error alias, sedangkan script kedua menghasilkan diagnostik kosong ketika menggunakan resolver yang sama.
+
+Perintah pengujian:
+```
+python -m pytest tests/test_tambahan.py::test_resolver_diagnostik_tidak_terbawa_ke_script_berikutnya -v
+```
+Sebelum perbaikan, hasilnya 1 failed in 0.54s. Setelah perbaikan, test yang sama menghasilkan 1 passed in 0.10s. Pengujian seluruh suite menghasilkan 52 passed in 0.27s.
+
+**Peran AI.**
+AI membantu dalam menemukan dan mengidentifikasi penyebab diagnostik lama terbawa melalui pemeriksaan fungsi resolve_script(), AI juga memberikan gamabran terkait penyusunan test regrasi dan menyarankan pembuatan list diagnostik baru.
+
 ## =============================================================================================================
 ## Bug 1: (judul singkat)
 

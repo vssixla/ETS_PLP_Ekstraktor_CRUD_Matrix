@@ -326,3 +326,26 @@ def test_tepi_parameter_titik_dua_tanpa_nama():
     # Risiko: pelonggaran karakter awal parameter membuat ':' kosong diterima.
     with pytest.raises(LexError):
         tokenize(":")
+
+#Bug 
+def test_resolver_diagnostik_tidak_terbawa_ke_script_berikutnya():
+    from crud.parser import parse_sql
+    from crud.resolver import Resolver
+
+    script_salah = parse_sql("SELECT q.id FROM pelanggan p;")
+    script_valid = parse_sql("SELECT p.id FROM pelanggan p;")
+
+    assert script_salah.errors == []
+    assert script_valid.errors == []
+
+    resolver = Resolver()
+
+    diagnostics_pertama = resolver.resolve_script(script_salah)
+    assert len(diagnostics_pertama) == 1
+    assert diagnostics_pertama[0].level == "error"
+    assert diagnostics_pertama[0].message == "alias 'q' tidak terdefinisi"
+    assert resolver.scope is None
+
+    diagnostics_kedua = resolver.resolve_script(script_valid)
+    assert diagnostics_kedua == []
+    assert resolver.scope is None
