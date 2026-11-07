@@ -327,3 +327,8 @@ def test_tepi_penanda_komentar_di_dalam_string():
     assert tokens[0].type == TokenType.STRING
     assert tokens[0].value == "-- bukan komentar /* tetap string */"
     assert tokens[1].type == TokenType.EOF
+
+def test_tepi_parameter_titik_dua_tanpa_nama():
+    # Risiko: pelonggaran karakter awal parameter membuat ':' kosong diterima.
+    with pytest.raises(LexError):
+        tokenize(":")
