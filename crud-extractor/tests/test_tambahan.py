@@ -263,8 +263,10 @@ def test_left_outer_join_diterima():
     sql = "SELECT p.id FROM pelanggan p LEFT OUTER JOIN pesanan s ON p.id = s.id;"
     script = parse_sql(sql)
 
+    assert script.errors == []
+    assert len(script.statements) == 1
     assert len(script.statements[0].joins) == 1
-    assert script.statements[0].joins[0].kind == "LEFT" 
+    assert script.statements[0].joins[0].kind == "LEFT"
 
 # Test Bug 10: LEXER MENOLAK PARAMETER BERAWALAN ANGKA
 def test_parameter_berawalan_angka():

@@ -300,13 +300,7 @@ Potongan ekspresi ini digunakan agar kesalahan pembentukan token dapat diamati l
 Kesalahan berada pada fungsi _scan_token() dalam crud/lexer.py, khususnya pada cabang yang menangani karakter <. Kode awalnya adalah:
 ```
 if ch == "<":
-    if self._match("="):
-        op = "<="
-    elif self._match(">"):
-        op = "<>"
-    else:
-        op = "<"
-
+    op = "<=" if self._match("=") else "<"
     self._add(TokenType.OP, op, line, col)
     return
 ```
@@ -338,7 +332,7 @@ if ch == "<":
         op = "<"
 
     self._add(TokenType.OP, op, line, col)
-     return
+    return
 ```
 
 Perbaikan dilakukan pada bagian if ch == "<" dengan menambahkan pemeriksaan self._match(">") untuk mengenali operator <>. Fungsi _match() memeriksa sekaligus mengonsumsi karakter berikutnya apabila sesuai, sehingga < dan > dikenali sebagai satu token OP, bukan dua token terpisah. Sementara itu, percabangan if, elif, dan else tetap mempertahankan dukungan operator <= dan <. Pemanggilan _add() digunakan untuk menyimpan operator yang dikenali sebagai satu token, sedangkan return mengakhiri pemindaian token tersebut. Perubahan dilakukan pada lexer karena pengenalan operator merupakan tanggung jawab lexer.
@@ -483,7 +477,7 @@ Test test_alias_delete_tidak_bocor_ke_statement_berikutnya ditambahkan dalam tes
 DELETE FROM sesi s WHERE s.id = 1;
 SELECT s.id FROM pengguna u;
 ```
-Input tersebut menggunakan alias s secara sah pada kondisi DELETE, kemudian menggunakan alias yang sama pada SELECT berikutnya tanpa mendeklarasikannya kembali. Test mengambil pesan dari hasil.diagnostics dan memeriksa keberadaan pesan yang menyebut alias 's'. Pemeriksaan ini digunakan untuk mendeteksi apakah resolver melaporkan penggunaan alias yang sudah tidak berlaku.
+Test test_alias_delete_tidak_bocor_ke_statement_berikutnya memeriksa bahwa input tidak menghasilkan kesalahan lexer maupun parser, tetapi menghasilkan tepat satu diagnostic berlevel error dengan pesan alias 's' tidak terdefinisi pada baris 2. Dalam pemeriksaan ulang berbantuan AI, test terbaru dijalankan pada salinan kode sebelum perbaikan Bug 6 dan gagal karena daftar diagnostic masih kosong. Pada kode setelah perbaikan, test tersebut lulus. Hasil ini menunjukkan bahwa penambahan _pop() mencegah alias DELETE terbawa ke statement berikutnya.
 
 Pengujian dilakukan menggunakan perintah:
 ```

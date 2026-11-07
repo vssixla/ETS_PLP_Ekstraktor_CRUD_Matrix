@@ -25,7 +25,8 @@
 | 21 | Shahnaz | Saya menemukan file `.pyc` dan file kosong bernama `python` ikut ter-commit. Apakah perlu dihapus dari repositori? | **Diterima:** dibuat `.gitignore`, lalu `git rm --cached` untuk `__pycache__` dan `git rm python`. | File hasil kompilasi dan file salah ketik tidak termasuk hasil kerja. | `git status` sebelum commit menunjukkan hanya file yang dimaksud, dan seluruh pytest tetap lulus. |
 | 22 | Shahnaz | Saya sudah push enam commit untuk Kartu Desain. Apakah tabelnya sudah sesuai? | **Diubah:** baris kosong di antara baris tabel dihapus. | Baris kosong memutus tabel Markdown sehingga tidak tampil sebagai tabel di GitHub. | Memeriksa isi file dan membuka tampilan di GitHub setelah perbaikan. |
 | 23 | Shahnaz | Saya ingin memeriksa kembali pengerjaan kami secara keseluruhan. Apakah pembagian bug per tahap (lexer, parser, resolver, analyzer) sudah benar? | **Diterima:** ringkasan empat tahap pipeline dan daftar bug per tahap. | Tiap anggota harus bisa menjelaskan seluruh kode saat demo. | Mencocokkan dengan `SPESIFIKASI.md` bagian 7, `LAPORAN_BUG.md`, dan riwayat commit. |
-
+| 24 | Alia | Berikut catatan penggunaan AI kami. Tolong rapikan menjadi tabel sesuai template. | **Diubah:** uraian diringkas menjadi tugas, hasil, alasan, dan cara verifikasi. | Log harus mudah dibaca dan tetap menggambarkan penggunaan AI yang sebenarnya. | Membandingkan entri dengan percakapan, perubahan kode, dan hasil pengujian yang tersedia. |
+| 25 | Alia | 	Periksa repositori GitHub kami berdasarkan deskripsi, spesifikasi, dan catatan dosen. | **Diterima sebagian:** CSV lama diperbarui, penanda TODO T1 dihapus, dan salah ketik pada laporan diperbaiki; saran lainnya ditinjau kembali. | File yang dikumpulkan harus sesuai dengan kode terbaru dan persyaratan tugas. | MAI memeriksa salinan repositori, menjalankan 51 test dan evaluasi, lalu memeriksa kembali perubahan yang sudah di-push. |
 
 
 ## Refleksi (3-5 kalimat)
