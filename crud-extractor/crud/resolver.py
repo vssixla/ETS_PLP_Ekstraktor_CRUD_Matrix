@@ -172,7 +172,7 @@ class Resolver:
             for arg in expr.args:
                 self._expr(arg)
 
-    # Resolusi kolom berdasarkan qualifier dan jumlah sumber pada scope terdalam.(TODO 2)
+    # Resolusi kolom berdasarkan qualifier dan jumlah sumber pada scope terdalam.
     def _column(self, col: ast.ColumnRef) -> None:
         if col.qualifier is not None:
             entry = self._lookup(col.qualifier)

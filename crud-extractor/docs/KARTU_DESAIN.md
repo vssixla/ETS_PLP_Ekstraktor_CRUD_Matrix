@@ -1,4 +1,4 @@
-# Kartu Desain
+# KARTU DESAIN
 
 Keputusan ini mengacu pada `SPESIFIKASI.md` dan perbaikan yang dilakukan dengan tetap mempertahankan API publik serta urutan pipeline lexer, parser, resolver, dan analyzer.
 

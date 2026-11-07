@@ -1,9 +1,3 @@
-"""Antarmuka baris perintah.
-
-Contoh:
-    python -m crud.cli data/sample/*.sql --out crud_matrix.csv --detail detail.csv
-    python -m crud.cli data/sample/audit.sql --ast
-"""
 import argparse
 import csv
 import sys

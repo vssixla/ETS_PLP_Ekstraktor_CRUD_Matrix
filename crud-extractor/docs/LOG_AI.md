@@ -28,5 +28,5 @@
 
 
 
-**Refleksi (3-5 kalimat).** Di bagian mana AI paling membantu? Di mana AI keliru atau
-menyesatkan, dan bagaimana kalian mengetahuinya?
+## Refleksi (3-5 kalimat)
+AI paling membantu dalam menjelaskan konsep tugas, mencari penyebab test gagal, dan memberikan saran perbaikan kode, sehingga waktu pengerjaan lebih efisien dan kami memiliki lebih banyak waktu untuk memahami konsepnya. Namun, beberapa saran AI kurang tepat atau tidak konsisten dengan spesifikasi, sehingga tetap perlu diperiksa. Contohnya, AI pernah menyarankan input SELECT nama; untuk menguji resolver, padahal grammar proyek mewajibkan FROM, serta memberikan penjelasan kasus regex yang menyebut subquery dan JOIN meskipun tidak sesuai dengan contoh dan hasil evaluasi. Kami mengetahui kekeliruan tersebut dengan menjalankan pytest, membaca keluaran evaluasi, dan mencocokkannya dengan kode serta SPESIFIKASI.md. Karena itu, kami memperjelas konteks pertanyaan dan memverifikasi saran AI sebelum menggunakannya, serta tidak menganggap seluruh tugas selesai hanya karena semua test lulus.

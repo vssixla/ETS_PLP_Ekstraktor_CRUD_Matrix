@@ -1,5 +1,3 @@
-"""Node AST untuk subset SQL. Struktur node adalah bagian dari API publik
-(SPESIFIKASI.md bagian 7): jangan ganti nama kelas atau field."""
 from dataclasses import dataclass, field, fields, is_dataclass
 
 
