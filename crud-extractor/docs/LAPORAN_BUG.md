@@ -1,8 +1,5 @@
 # Laporan Bug
 
-Salin blok di bawah untuk setiap bug. Bagian **Akar masalah** wajib ditulis dengan kata-kata
-sendiri dan memakai konsep dari *Crafting Interpreters* (sebutkan bab). Bagian ini diuji lisan.
-
 ---
 
 ## TODO T1: Melengkapi Dukungan INSERT ... SELECT
@@ -390,7 +387,7 @@ Perubahan dilakukan pada `crud/analyzer.py`, di cabang UPDATE pada `analyze_stat
 Alternatif yang dipertimbangkan adalah membiarkan penelusuran seperti semula, lalu membuang status U dari semua tabel selain target setelah analisis selesai. Alternatif ini tidak dipilih karena hanya menambal hasil, sedangkan penyebabnya adalah operasi yang salah diteruskan saat penelusuran.
 
 **Test regresi.**
-Test `test_subquery_di_update_hanya_dibaca` ditambahkan di `tests/test_tambahan.py`. Sebelum perbaikan test ini gagal karena `pesanan` bernilai `U`, dan sesudah perbaikan lulus. Test bawaan `test_matrix_laporan_penjualan` yang sebelumnya gagal juga ikut lulus. Satu-satunya test yang masih gagal pada seluruh suite adalah test TODO(T2) di resolver yang sedang dikerjakan.
+Test `test_subquery_di_update_hanya_dibaca` ditambahkan di `tests/test_tambahan.py`. Sebelum perbaikan test ini gagal karena `pesanan` bernilai `U`, dan sesudah perbaikan lulus. Test bawaan `test_matrix_laporan_penjualan` yang sebelumnya gagal juga ikut lulus. 
 
 **Peran AI.**
 AI menunjukkan lokasi kode yang perlu diperiksa dan mengusulkan perubahan `"U"` menjadi `"R"` serta contoh isi test. Saya menulis test, menjalankannya sampai terlihat gagal, mengubah dua baris di `analyzer.py`, lalu memverifikasi bahwa test tersebut lulus dan seluruh suite tidak memiliki test baru yang rusak.
@@ -766,30 +763,3 @@ Sebelum perbaikan, hasilnya 1 failed in 0.54s. Setelah perbaikan, test yang sama
 
 **Peran AI.**
 AI membantu dalam menemukan dan mengidentifikasi penyebab diagnostik lama terbawa melalui pemeriksaan fungsi resolve_script(), AI juga memberikan gamabran terkait penyusunan test regrasi dan menyarankan pembuatan list diagnostik baru.
-
-## =============================================================================================================
-## Bug 1: (judul singkat)
-
-**Ditemukan oleh:** (nama) · **Diperbaiki oleh:** (nama)
-
-**Gejala.** Input, output yang didapat, dan output yang diharapkan menurut SPESIFIKASI.md
-(sebutkan bagiannya).
-
-**Reproduksi minimal.** SQL terpendek yang memicu bug:
-
-```sql
-
-```
-
-**Akar masalah.** Mengapa kode lama salah? Konsep apa yang dilanggar?
-
-**Perbaikan.** File dan fungsi yang diubah, serta alasannya. Sebutkan juga perbaikan
-alternatif yang kalian pertimbangkan dan alasan tidak memilihnya.
-
-**Test regresi.** Nama test di `tests/test_tambahan.py` yang gagal sebelum perbaikan dan lulus
-sesudahnya.
-
-**Peran AI.** Apakah AI membantu menemukan atau memperbaiki bug ini? Bagaimana kalian
-memverifikasinya?
-
----
