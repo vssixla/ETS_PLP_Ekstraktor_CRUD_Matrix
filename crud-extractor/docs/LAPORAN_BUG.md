@@ -584,6 +584,75 @@ Sebelum perbaikan, test menghasilkan 1 failed in 0.62s karena akar ekspresi beru
 AI membantu dalam menemukan penyebab keselahan logika pada fungsi sebelumnya, membantu dalam memperbaiki test pemeriksaan AST, dan menyarankan pemisahan fungsi _logical() dan _and(). AI juga membantu saya dalam keslahan logical ini pada konsep teori.
 
 
+## BUG 9: PARSER MENOLAK LEFT OUTER JOIN
+**Ditemukan oleh:** ALIA ARDANI dan SHAHNAZ SASKIA PUTRI · 
+**Diperbaiki oleh:** ALIA ARDANI
+
+**Gejala.**
+Menurut grammar pada SPESIFIKASI.md bagian 3, kata OUTER bersifat opsional setelah LEFT. Artinya, bentuk LEFT JOIN maupun LEFT OUTER JOIN seharusnya diterima oleh parser.
+
+Namun, parser lama menolak query yang menggunakan LEFT OUTER JOIN. Program menghasilkan parse error ketika menemukan keyword OUTER, sehingga statement SELECT tersebut tidak berhasil diparsing. Hasil yang diharapkan adalah tidak ada parse error dan terbentuk satu statement SELECT dengan jenis join "LEFT".
+
+**Reproduksi minimal.** 
+```
+SELECT p.id FROM pelanggan p LEFT OUTER JOIN pesanan s ON p.id = s.id;
+```
+Pada kode lama, query tersebut menghasilkan pesan: Baris 1, kolom 35: diharapkan JOIN, ditemukan 'OUTER'
+Kesalahan muncul karena parser langsung mengharapkan JOIN setelah membaca LEFT, padahal terdapat keyword opsional OUTER di antaranya.
+
+**Akar masalah.**
+Masalah terdapat pada fungsi _join() dalam crud/parser.py. Kode lama mengenali LEFT dan menetapkan jenis join, tetapi belum memeriksa kemungkinan adanya OUTER:
+```
+elif self._match_kw("LEFT"):
+    kind = "LEFT"
+self._expect_kw("JOIN")
+```
+Setelah LEFT dikonsumsi, token aktif masih berupa OUTER. Pemanggilan _expect_kw("JOIN") kemudian gagal karena token tersebut tidak sesuai dengan keyword yang diharapkan. Dengan demikian, fungsi parser belum menerapkan seluruh bentuk yang diperbolehkan oleh grammar.
+
+Masalah ini berkaitan dengan Crafting Interpreters Bab 6 bagian 6.2, yang menjelaskan penerjemahan aturan grammar menjadi fungsi parser recursive descent. Unsur opsional dalam grammar diterjemahkan menjadi pemeriksaan bersyarat. Dalam proyek ini, parser perlu memeriksa dan mengonsumsi OUTER jika ada, kemudian tetap mewajibkan JOIN.
+
+**Perbaikan.**
+Perubahan dilakukan pada fungsi _join() dalam crud/parser.py dengan menambahkan self._match_kw("OUTER") setelah penetapan kind = "LEFT":
+```
+def _join(self) -> ast.Join:
+    tok = self._peek()
+    kind = "INNER"
+
+    if self._match_kw("INNER"):
+        kind = "INNER"
+    elif self._match_kw("LEFT"):
+        kind = "LEFT"
+        # OUTER boleh ada atau tidak setelah LEFT.
+        self._match_kw("OUTER")
+
+    self._expect_kw("JOIN")
+    source = self._table_ref()
+    self._expect_kw("ON")
+    condition = self._expr()
+    return ast.Join(kind, source, condition, line=tok.line)
+```
+Fungsi _match_kw("OUTER") mengonsumsi keyword tersebut jika tersedia. Jika tidak tersedia, parser melanjutkan pemeriksaan JOIN tanpa menghasilkan error. Dengan demikian, kedua bentuk dapat diterima dan tetap direpresentasikan sebagai jenis join "LEFT" pada AST.
+
+Pemeriksaan ditempatkan di dalam cabang LEFT agar penerimaan OUTER mengikuti posisi yang ditetapkan grammar. Perubahan ini tidak memerlukan perubahan struktur AST maupun API publik.
+
+Alternatif menggunakan _expect_kw("OUTER") tidak dipilih karena akan menjadikan OUTER wajib. Akibatnya, bentuk LEFT JOIN yang juga valid justru akan ditolak.
+
+**Test regresi.**
+Test test_left_outer_join_diterima ditambahkan dalam tests/test_tambahan.py. Test menggunakan query pada reproduksi minimal dan memeriksa bahwa script.errors kosong serta jumlah statement yang terbentuk adalah satu.
+
+Pada percobaan awal, penulisan input test kekurangan spasi sehingga alias p tergabung dengan keyword LEFT menjadi pLEFT. Input test diperbaiki terlebih dahulu dengan menuliskan SQL dalam satu baris. Kegagalan dari input yang salah tersebut tidak digunakan sebagai bukti Bug 9.
+
+Setelah input benar, test dijalankan sebelum perubahan parser menggunakan:
+```
+python -m pytest tests/test_tambahan.py::test_left_outer_join_diterima -v
+```
+Hasilnya 1 failed in 0.55s, dengan pesan bahwa parser mengharapkan JOIN tetapi menemukan OUTER. Setelah fungsi _join() diperbaiki, test yang sama menghasilkan 1 passed in 0.11s tanpa mengubah lagi input maupun pemeriksaan test.
+
+**Peran AI.**
+AAI membantu saya dalam menemukan bug ini, membantu memperbaiki kode program untuk perbaikan fungsi dan kede program untuk test, AI juga menunjukkan bagian fungsi _join() yang menyebabkan OUTER ditolak dan menyarankan penggunaan _match_kw("OUTER")
+
+
+
 ## =============================================================================================================
 ## Bug 1: (judul singkat)
 
