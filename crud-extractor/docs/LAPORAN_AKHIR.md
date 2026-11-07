@@ -1,9 +1,9 @@
 # Laporan Akhir
 
 ## 1. Hasil evaluasi
+Evaluasi dilakukan menggunakan python evaluate.py terhadap empat file SQL dengan 27 label ground truth. Setiap label memuat nama file, baris awal statement, nama tabel, dan satu operasi CRUD. Label ditentukan berdasarkan aturan dalam SPESIFIKASI.md
 
-Tempel keluaran `python evaluate.py` setelah `data/ground_truth.csv` dilengkapi.
-
+Hasil Evaluasi: 
 ```
 Dievaluasi: audit.sql, campuran_error.sql, laporan_penjualan.sql, pemeliharaan.sql (27 triple)
 
@@ -29,40 +29,100 @@ regex         0.65    0.81   0.72
   terlewat (FN):       ('laporan_penjualan.sql', 3, 'pesanan', 'R')
   terlewat (FN):       ('pemeliharaan.sql', 3, 'crm.alamat', 'R')
   terlewat (FN):       ('pemeliharaan.sql', 3, 'crm.pelanggan', 'R')
-
 ```
+Parser menghasilkan 27 label benar tanpa false positive (FP) maupun false negative (FN). Baseline regex menghasilkan 22 label benar, 12 FP, dan 5 FN. Precision menunjukkan ketepatan label yang dihasilkan, recall menunjukkan kelengkapan label yang ditemukan, sedangkan F1 menggabungkan keduanya.
+
 
 ## 2. Tiga kasus di mana regex salah
+### 1. Komentar Terbaca Sebagai Perintah
+Pada laporan_penjualan.sql baris 2 terdapat komentar:
+```
+-- DELETE FROM pelanggan. 
+```
+Regex menganggap teks tersebut sebagai perintah SQL yang sebenarnya, sehingga tabel pelanggan keliru teridentifikasi sebagai D. Hal ini terlihat pada hasil evaluasi berupa label ('laporan_penjualan.sql', 2, 'pelanggan', 'D'), yang termasuk false positive (FP).
 
-Untuk tiap kasus: SQL-nya, kesalahan regex, dan mengapa parser benar (kaitkan dengan konsep
-lexing, parsing, atau resolusi).
+Sementara itu, parser dapat mengenalinya dengan benar karena lexer melewati komentar sebelum proses parsing, sehingga teks komentar tidak ikut diproses sebagai token. Perilaku ini sesuai dengan SPESIFIKASI.md bagian 2.3 yang menyatakan bahwa komentar tidak menghasilkan token.
 
-#1. Komentar terbaca sebagai perintah. Pada laporan_penjualan.sql baris 2 terdapat komentar -- DELETE FROM pelanggan. Regex menganggap teks tersebut sebagai perintah SQL yang sebenarnya, sehingga tabel pelanggan keliru teridentifikasi sebagai D. Sementara itu, parser dapat mengenalinya dengan benar karena lexer menghapus komentar sebelum proses parsing, sehingga teks komentar tidak ikut diproses sebagai token.
+### 2. Teks Dalam String Dianggap Sebagai Nama Tabel
+Pada laporan_penjualan.sql baris 6 terdapat string 'FROM rahasia' dalam statement berikut:
+```
+SELECT p.nama, SUM(o.total) AS omzet
+FROM pelanggan p
+JOIN pesanan o ON o.pelanggan_id = p.id
+WHERE o.status = 'LUNAS' AND o.catatan <> 'FROM rahasia'
+GROUP BY p.nama;
+```
+Regex menganggap kata rahasia sebagai nama tabel yang sedang dibaca, padahal kata tersebut hanya bagian dari isi string. Hal ini terlihat pada hasil evaluasi berupa label ('laporan_penjualan.sql', 2, 'rahasia', 'R'), yang termasuk false positive (FP). Nomor baris 2 tersebut merupakan keluaran regex, sedangkan string sebenarnya berada pada baris 6.
 
-#2. Teks dalam string dianggap sebagai nama tabel. Pada laporan_penjualan.sql baris 6 terdapat string 'FROM rahasia'. Regex menganggap kata "rahasia" sebagai nama tabel yang sedang dibaca, padahal kata tersebut hanya bagian dari isi string. Parser tidak mengalami kesalahan ini karena lexer mengenali seluruh teks tersebut sebagai satu token STRING, sehingga kata FROM di dalamnya tidak dianggap sebagai keyword SQL.
+Parser tidak mengalami kesalahan ini karena lexer mengenali seluruh teks tersebut sebagai satu token STRING, sehingga kata FROM di dalamnya tidak dianggap sebagai keyword SQL. Perilaku ini sesuai dengan SPESIFIKASI.md bagian 2.4 dan berkaitan dengan konsep lexing dalam Crafting Interpreters Bab 4, yaitu mengenali literal string sebagai satu token. Karena rahasia tidak menjadi sumber tabel dalam AST, analyzer hanya mencatat pembacaan tabel pelanggan dan pesanan.
 
-#3. Subquery dan JOIN tidak terdeteksi dengan tepat. Pada audit.sql baris 2 terdapat perintah FROM pelanggan p, pesanan o, tetapi regex melewatkan tabel kedua, yaitu pesanan, yang ditulis setelah tanda koma. Kesalahan serupa juga terjadi pada laporan_penjualan.sql baris 5, ketika regex tidak menangkap tabel yang ditulis setelah JOIN. Sebaliknya, parser dapat membaca struktur FROM dengan benar karena memprosesnya sebagai daftar sumber tabel, bukan sekadar mencari kata setelah FROM.
+### 3. Tabel Setelah Koma Pada FROM Terlewat
+Statement pertama pada audit.sql adalah:
+```
+SELECT p.id, p.nama
+FROM pelanggan p, pesanan o
+WHERE o.pelanggan_id = p.id
+  AND o.tanggal BETWEEN :mulai AND :akhir
+  OR p.level = 'gold' AND p.aktif = 1;
+```
+Regex melewatkan label ('audit.sql', 2, 'pesanan', 'R'), sehingga tabel kedua dalam daftar FROM tidak tercatat sebagai sumber pembacaan. Parser mengikuti grammar FROM table_ref { "," table_ref } pada SPESIFIKASI.md bagian 3. Setiap sumber yang dipisahkan koma dimasukkan ke AST, kemudian analyzer memberikan operasi R kepada kedua tabel sesuai bagian 5.
 
 
 ## 3. Batas pendekatan kami
+### 1. Tidak Memiliki Informasi Skema dan Identitas Tabel dari Database
+Contoh:
+```
+SELECT nama FROM pelanggan p, pesanan o;
+SELECT id FROM pelanggan;
+SELECT id FROM crm.pelanggan;
+SELECT * FROM pelanggan;
+```
+Pada query pertama, kolom nama tidak menunjukkan secara jelas berasal dari tabel mana. Karena query menggunakan dua tabel, yaitu pelanggan dan pesanan, tool tidak dapat memastikan asal kolom tersebut. Sesuai dengan SPESIFIKASI.md bagian 4.3, resolver akan memberikan warning bahwa kolom nama ambigu dan nilai resolved tetap None. Meskipun CRUD Matrix tetap mencatat kedua tabel sebagai R, informasi pada keluaran --kolom menjadi kurang lengkap karena asal kolom nama belum dapat dipastikan.
 
-Minimal tiga hal yang **tidak bisa** ditangani dengan benar oleh tool ini meskipun semua bug
-sudah diperbaiki. Untuk tiap batas: contoh SQL atau situasinya, akibatnya pada CRUD matrix,
-dan informasi apa yang dibutuhkan untuk mengatasinya.
+Pada dua query berikutnya, pelanggan dan crm.pelanggan dianggap sebagai dua nama tabel yang berbeda. Padahal, jika skema default yang digunakan adalah crm, keduanya bisa saja merujuk ke tabel yang sama. Karena tool hanya membaca nama tabel yang tertulis pada query dan tidak memiliki informasi skema database, tabel yang sebenarnya sama bisa tercatat sebagai dua tabel berbeda dalam CRUD Matrix.
 
-#1. Kolom tanpa qualifier pada lebih dari satu tabel. Contoh SELECT nama FROM pelanggan p, pesanan o;. Pada query tersebut, kolom nama tidak disertai qualifier/nama tabel yang menunjukkan asal kolomnya. Karena terdapat dua tabel yang digunakan, tool tidak dapat memastikan apakah kolom nama berasal dari tabel pelanggan/pesanan. Ini terjadi karena tool belum memiliki informasi skema database yang dapat digunakan untuk mencocokkan kolom dengan tabelnya. Resolver hanya memberikan warning "ambigu tanpa skema" dan nilai resolved tetap none. Akibatnya CRUD matrix masih bisa mencatat kedua tabel sebagai R tapi informasi kolom yang ditampilkan pada laporan (--kolom) jadi tidak lengkap karena kolom nama tidak berhasil diidentifikasi. Untuk mengatasi masalah ini, diperlukan skema database yang berisi daftar kolom pada setiap tabel.
+Sementara itu, pada query SELECT *, tool tetap mencatat tabel pelanggan sebagai R, tetapi tidak dapat menampilkan nama-nama kolom yang dibaca karena informasi kolom tersebut tidak tersedia.
 
-#2. View, trigger, CTE, dan UNION. Contoh SELECT * FROM v_laporan;. Ketika query tersebut dijalankan, tool hanya mencatat v_laporan sebagai tabel yang dibaca (R) tanpa mengetahui tabel-tabel lain yang sebenarnya digunakan di dalam definisi view tersebut. Akibatnya aktivitas pembacaan terhadap tabel sumber tidak ikut tercatat dalam CRUD matrix. Masalah serupa juga terjadi pada trigger. Jika terdapat trigger yang secara otomatis menulis data ke tabel lain ketika perintah DELETE dijalankan, aktivitas penulisan tersebut tidak dapat terdeteksi oleh tool. Selain itu, query yang menggunakan CTE seperti WITH x AS (...) SELECT ... dan UNION seperti SELECT ... UNION SELECT ... belum dapat diproses karena strukturnya belum didukung dalam grammar parser. Akibatnya statement ditolak dan tabel yang terlibat tidak tercatat dalam matrix. Untuk mengatasi keterbatasan ini diperlukan definisi view dan trigger dari database serta pengembangan grammar parser agar dapat mengenali CTE dan UNION.
+Untuk mengatasi keterbatasan ini, tool memerlukan informasi tambahan dari database, seperti daftar kolom, identitas tabel, dan aturan skema default. Namun, informasi tersebut belum tersedia karena, sesuai dengan SPESIFIKASI.md bagian 7, tool hanya menganalisis teks query tanpa membaca struktur database secara langsung.
 
-#3. *Nama tabel tanpa skema dan penggunaan SELECT . Contoh SELECT id FROM pelanggan; dan SELECT id FROM crm.pelanggan;. Kedua query tersebut dapat merujuk pada tabel yang sama tetapi tool menganggapnya sebagai dua tabel berbeda karena penulisan nama tabel yang satu tidak memakai skema, sedangkan yang lainnya memakai skema crm. Perbedaan penulisan ini menyebabkan data tabel tercatat secara terpisah sehingga baris pada CRUD matrix menjadi terpecah. Selain itu, saat query menggunakan SELECT *, tool hanya tahu bahwa seluruh kolom dalam tabel sedang dibaca tapi tidak dapat merinci nama masing-masing kolom yang digunakan. Untuk mengatasi masalah tersebut, diperlukan skema database agar tool dapat mengenali identitas tabel dan mengetahui kolom-kolom yang tersedia, serta aturan skema default untuk menentukan skema yang digunakan ketika nama tabel ditulis tanpa qualifier.
+### 2. Tidak Mengetahui Tabel Dasar View dan Efek Trigger
+Contoh: 
+```
+SELECT * FROM v_laporan;
+DELETE FROM pelanggan WHERE id = :id;
+```
+Pada query pertama, tool hanya mencatat v_laporan sebagai tabel yang dibaca (R), tanpa mengetahui tabel yang digunakan dalam definisi view tersebut. Misalnya, jika v_laporan mengambil data dari tabel pelanggan dan pesanan, pembacaan kedua tabel tersebut tidak ikut tercatat dalam CRUD matrix karena tool tidak memiliki definisi view-nya.
+
+Masalah serupa terjadi pada trigger. Jika perintah DELETE pada tabel pelanggan secara otomatis menjalankan trigger yang menambahkan data ke tabel log_penghapusan, tool hanya mencatat D pada pelanggan. Operasi C pada log_penghapusan tidak terdeteksi karena perintah penambahan data tersebut berada dalam trigger, bukan dalam query yang dianalisis.
+
+View dan trigger berada di luar lingkup SPESIFIKASI.md bagian 9. Untuk mengatasi keterbatasan ini, diperlukan definisi view dan trigger dari database, serta pengembangan analisis agar tool dapat menelusuri tabel dan operasi yang digunakan di dalamnya.
+
+### 3. Grammar Hanya Mendukung Subset SQL yang Ditentukan
+Contoh: 
+```
+WITH aktif AS (
+    SELECT id FROM pelanggan WHERE aktif = 1
+)
+SELECT id FROM aktif;
+
+SELECT id FROM pelanggan
+UNION
+SELECT id FROM pelanggan_arsip;
+```
+Query yang menggunakan CTE (WITH) dan UNION belum dapat diproses karena strukturnya belum didukung dalam grammar parser. Keduanya berada di luar lingkup SPESIFIKASI.md bagian 9. Akibatnya, statement menghasilkan parse error dan tabel yang terlibat dalam statement tersebut tidak tercatat dalam CRUD matrix, sesuai aturan bagian 5.
+
+Untuk mengatasi keterbatasan ini, diperlukan aturan sintaks CTE dan UNION sebagai dasar pengembangan grammar, AST, resolver, serta analyzer. Pada CTE, tool perlu mengenali bahwa aktif merupakan nama hasil query sementara dan menelusuri tabel sumbernya, yaitu pelanggan. Pada UNION, tool perlu membaca kedua query agar tabel pelanggan dan pelanggan_arsip sama-sama tercatat sebagai R.
+
 
 ## 4. Pembagian kerja
+Pengerjaan proyek dilakukan oleh Alia Ardani dan Shahnaz Saskia Putri. Sebelum melakukan perbaikan, kami berdiskusi dan melakukan brainstorming bersama untuk mencari masalah pada program. Kami membandingkan program dengan ketentuan yang ada di SPESIFIKASI.md, kemudian mencatat masalah yang ditemukan, kemungkinan penyebabnya, dan hal-hal yang perlu diperbaiki.
 
-Siapa mengerjakan apa, dan bagaimana kalian memastikan keduanya memahami seluruh kode.
+Ketika salah satu dari kami menemukan masalah, temuan tersebut langsung disampaikan kepada diantara kami. Misalnya, ketika Alia menemukan suatu masalah, Alia akan mengabarkannya kepada Shahnaz. Setelah itu, Shahnaz akan memeriksa kembali apakah masalah tersebut memang sesuai dengan spesifikasi dan apakah penyebab yang ditemukan sudah tepat. Jika kami memiliki pemahaman yang sama dan hasil pemeriksaan mendukung temuan tersebut, perbaikan dapat dilanjutkan. Namun, jika masih ada perbedaan pendapat atau penyebabnya belum jelas, kami tidak langsung melakukan perubahan. Kami akan memeriksa kembali kode, spesifikasi, dan hasil pengujian sampai menemukan penjelasan yang sesuai.
 
-Pekerjaan ini dikerjakan berdua oleh Alia Ardani dan Shahnaz Saskia Putri secara bergantian. Sebelum mengubah file, kami saling mengabari supaya tidak terjadi konflik di Git.
+Untuk pembagian tanggung jawab dalam pengerjaan proyek adalah sebagai berikut:
+| Anggota | Tanggung Jawab Utama |
+| :--- | :--- |
+| **Alia Ardani** | - T1: Dukungan `INSERT ... SELECT`.<br>- T2: Kolom tanpa qualifier.<br>- Bug 1: Error recovery.<br>- Bug 3: Operator `<>`.<br>- Bug 7: Shadowing.<br>- Bug 8: Presedensi AND/OR.<br>- Bug 9: `LEFT OUTER JOIN`.<br>- Bug 10: Parameter berawalan angka.<br>- Bug 11: Diagnostik resolver antar pemanggilan.<br>- Kasus Tepi 1: Input Kosong Menghasilkan EOF.<br>- Kasus Tepi 2: Input Hanya WhiteSpace.<br>- Kasus Tepi 3: Komentar Tanpa NewLine di Akhir Input. |
+| **Shahnaz Saskia Putri** | - T3: Komentar blok.<br>- Bug 2: Keyword tidak peka huruf besar/kecil.<br>- Bug 4: Escape kutip dalam string.<br>- Bug 5: Subquery UPDATE.<br>- Bug 6: Scope DELETE.<br>- Bug 11: Diagnostik resolver antar pemanggilan.<br>- Pelabelan ground truth `audit.sql` dan `pemeliharaan.sql`.<br>- Kasus Tepi 3: Komentar Tanpa NewLine di Akhir Input.<br>- Kasus Tepi 4: Penanda Komentar dalam String.<br>- Kasus Tepi 5: Parameter Titik Dua Tanpa Nama. |
 
-#Alia Ardani: T1, T2, bug 1 (error recovery), bug 3 (operator <>), bug 7 (scope dalam menutupi scope luar), bug 8 (presedensi AND/OR), bug 9 (LEFT OUTER JOIN), dan bug 10 (parameter berawalan angka), serta sebagian besar laporan bug.
-#Shahnaz Saskia Putri: T3 (komentar blok), bug 2 (keyword huruf kecil), bug 4 (kutip ganda di string), bug 5 (subquery di UPDATE), bug 6 (scope DELETE), label ground truth untuk audit.sql dan pemeliharaan.sql, serta LAPORAN_AKHIR.
-
-Agar saling faham, kami saling menjelaskan bagian yang dikerjakan partner, membaca laporan bug satu sama lain, dan menjalankan python -m crud.cli FILE --ast untuk melihat hasil parsing dan resolusi.
+Dalam proses pengerjaan, AI juga digunakan sebagai alat bantu untuk berdiskusi, mencari kemungkinan penyebab masalah, dan memeriksa usulan perbaikan. Namun, setiap hasil yang diperoleh tetap kami periksa kembali dengan mengacu pada spesifikasi dan hasil pengujian.
